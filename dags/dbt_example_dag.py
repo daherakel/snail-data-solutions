@@ -1,12 +1,9 @@
 """
-DAG que ejecuta modelos de dbt usando Astronomer Cosmos
+DAG que ejecuta modelos de dbt usando BashOperator
 """
 from datetime import datetime
-from pathlib import Path
-
 from airflow.decorators import dag
-from cosmos import DbtTaskGroup, ProjectConfig, ProfileConfig, ExecutionConfig
-from cosmos.profiles import PostgresUserPasswordProfileMapping
+from airflow.operators.bash import BashOperator
 
 
 @dag(
@@ -15,46 +12,32 @@ from cosmos.profiles import PostgresUserPasswordProfileMapping
     schedule=None,
     catchup=False,
     tags=['dbt', 'example'],
-    description='Ejemplo de ejecución de dbt con Cosmos',
+    description='Ejemplo de ejecución de dbt',
+    default_args={
+        'owner': 'snail-data',
+        'retries': 1,
+    },
 )
 def dbt_example_dag():
     """DAG que ejecuta los modelos de dbt de ejemplo"""
 
-    # Configuración del proyecto dbt
-    dbt_project_path = Path("/usr/local/airflow/include/dbt")
-
-    # Configuración del perfil de conexión
-    profile_config = ProfileConfig(
-        profile_name="snail_data_solutions",
-        target_name="dev",
-        profile_mapping=PostgresUserPasswordProfileMapping(
-            conn_id="postgres_default",
-            profile_args={
-                "schema": "public",
-            },
-        ),
+    dbt_debug = BashOperator(
+        task_id='dbt_debug',
+        bash_command='cd /usr/local/airflow/include/dbt && dbt debug',
     )
 
-    # Configuración del proyecto
-    project_config = ProjectConfig(
-        dbt_project_path=dbt_project_path,
+    dbt_run = BashOperator(
+        task_id='dbt_run',
+        bash_command='cd /usr/local/airflow/include/dbt && dbt run',
     )
 
-    # Configuración de ejecución
-    execution_config = ExecutionConfig(
-        dbt_executable_path="/usr/local/bin/dbt",
+    dbt_test = BashOperator(
+        task_id='dbt_test',
+        bash_command='cd /usr/local/airflow/include/dbt && dbt test',
     )
 
-    # Task Group que ejecuta todos los modelos dbt
-    dbt_tg = DbtTaskGroup(
-        group_id="dbt_transform",
-        project_config=project_config,
-        profile_config=profile_config,
-        execution_config=execution_config,
-        default_args={"retries": 2},
-    )
-
-    dbt_tg
+    # Flujo: debug -> run -> test
+    dbt_debug >> dbt_run >> dbt_test
 
 
 dbt_example_dag()
