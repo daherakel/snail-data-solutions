@@ -1,0 +1,13 @@
+snail_data_solutions:
+  target: dev
+  outputs:
+    dev:
+      type: postgres
+      host: "{{ env_var('DBT_HOST', 'localhost') }}"
+      user: "{{ env_var('DBT_USER', 'airflow') }}"
+      password: "{{ env_var('DBT_PASSWORD', 'airflow') }}"
+      port: "{{ env_var('DBT_PORT', '5432') | as_number }}"
+      dbname: "{{ env_var('DBT_DATABASE', 'airflow') }}"
+      schema: "{{ env_var('DBT_SCHEMA', 'public') }}"
+      threads: 4
+      keepalives_idle: 0

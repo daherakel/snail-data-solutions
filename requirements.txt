@@ -1,0 +1,12 @@
+# Airflow providers
+apache-airflow-providers-dbt-cloud
+
+# dbt core (uncomment based on your database)
+# dbt-core
+# dbt-postgres
+# dbt-snowflake
+# dbt-bigquery
+# dbt-redshift
+
+# Other dependencies
+astronomer-cosmos
