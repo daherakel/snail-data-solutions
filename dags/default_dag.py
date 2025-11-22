@@ -1,35 +1,27 @@
-"""
-Default DAG for Snail Data Solutions
-"""
+"""Default DAG for Snail Data Solutions"""
 from datetime import datetime, timedelta
-from airflow import DAG
+from airflow.decorators import dag, task
 from airflow.operators.empty import EmptyOperator
 
-default_args = {
-    'owner': 'snail-data',
-    'depends_on_past': False,
-    'email_on_failure': False,
-    'email_on_retry': False,
-    'retries': 1,
-    'retry_delay': timedelta(minutes=5),
-}
-
-with DAG(
-    'default_dag',
-    default_args=default_args,
-    description='Default DAG for Snail Data Solutions',
-    schedule_interval=None,
+@dag(
+    dag_id='default_dag',
     start_date=datetime(2024, 1, 1),
+    schedule=None,
     catchup=False,
     tags=['default', 'snail-data'],
-) as dag:
+    description='Default DAG for Snail Data Solutions',
+    default_args={
+        'owner': 'snail-data',
+        'retries': 1,
+        'retry_delay': timedelta(minutes=5),
+    },
+)
+def default_dag():
+    """Simple default DAG demonstrating basic Airflow 3 structure"""
 
-    start = EmptyOperator(
-        task_id='start'
-    )
-
-    end = EmptyOperator(
-        task_id='end'
-    )
+    start = EmptyOperator(task_id='start')
+    end = EmptyOperator(task_id='end')
 
     start >> end
+
+default_dag()
