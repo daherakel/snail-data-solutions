@@ -1,8 +1,6 @@
-version: '3.8'
-
 x-airflow-common:
   &airflow-common
-  build: .
+  image: apache/airflow:2.10.2
   environment:
     &airflow-common-env
     AIRFLOW__CORE__EXECUTOR: LocalExecutor
@@ -20,11 +18,11 @@ x-airflow-common:
     DBT_SCHEMA: public
     DBT_PORT: 5432
   volumes:
-    - ./dags:/usr/local/airflow/dags
-    - ./include:/usr/local/airflow/include
-    - ./plugins:/usr/local/airflow/plugins
-    - ./tests:/usr/local/airflow/tests
-    - airflow-logs:/usr/local/airflow/logs
+    - ./dags:/opt/airflow/dags
+    - ./include:/opt/airflow/include
+    - ./plugins:/opt/airflow/plugins
+    - ./tests:/opt/airflow/tests
+    - airflow-logs:/opt/airflow/logs
   user: "${AIRFLOW_UID:-50000}:0"
   depends_on:
     &airflow-common-depends-on
