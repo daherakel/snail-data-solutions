@@ -1,7 +1,8 @@
 """Default DAG for Snail Data Solutions"""
 from datetime import datetime, timedelta
-from airflow.decorators import dag, task
+from airflow.decorators import dag
 from airflow.operators.empty import EmptyOperator
+
 
 @dag(
     dag_id='default_dag',
@@ -17,11 +18,12 @@ from airflow.operators.empty import EmptyOperator
     },
 )
 def default_dag():
-    """Simple default DAG demonstrating basic Airflow 3 structure"""
+    """Simple default DAG demonstrating basic Airflow structure"""
 
     start = EmptyOperator(task_id='start')
     end = EmptyOperator(task_id='end')
 
     start >> end
+
 
 default_dag()
