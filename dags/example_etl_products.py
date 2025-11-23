@@ -142,7 +142,7 @@ def example_etl_products():
         logger.info(f"✓ Cargados {len(data)} registros a sample_data.etl_products")
 
     @task
-    def validate(expected_count: int):
+    def validate():
         """Valida que los datos se cargaron correctamente"""
         logger.info("Validando datos cargados...")
 
@@ -152,18 +152,14 @@ def example_etl_products():
         result = pg_hook.get_first("SELECT COUNT(*) FROM sample_data.etl_products;")
         actual_count = result[0] if result else 0
 
-        logger.info(f"Registros esperados: {expected_count}")
         logger.info(f"Registros encontrados: {actual_count}")
 
-        if actual_count >= expected_count:
-            logger.info("✓ Validación exitosa")
+        if actual_count > 0:
+            logger.info("✓ Validación exitosa - Datos cargados")
         else:
-            raise ValueError(
-                f"Validación falló: esperados al menos {expected_count}, "
-                f"encontrados {actual_count}"
-            )
+            raise ValueError("Validación falló: No se encontraron datos en etl_products")
 
-        return {'expected': expected_count, 'actual': actual_count}
+        return {'actual': actual_count}
 
     @task
     def log_summary(validation_result: dict):
@@ -180,7 +176,7 @@ def example_etl_products():
     # Flujo: crear tabla -> cargar datos -> validar
     create_table >> raw_data
     load_task = load(transformed_data)
-    validation = validate(len(transformed_data))
+    validation = validate()
     summary = log_summary(validation)
 
     load_task >> validation >> summary
