@@ -4,3 +4,6 @@
 # Install manually inside container if needed:
 #   astro dev bash
 #   pip install dbt-postgres
+
+# Configuration and utilities
+PyYAML>=6.0,<7.0

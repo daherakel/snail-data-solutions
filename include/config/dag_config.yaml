@@ -1,0 +1,55 @@
+# Configuración global para DAGs
+default:
+  owner: snail-data
+  retries: 1
+  retry_delay_minutes: 5
+  postgres_conn_id: postgres_default
+
+# Configuración de conexiones
+connections:
+  postgres:
+    conn_id: postgres_default
+    schema: sample_data
+
+# Configuración específica por DAG
+dags:
+  seed_database:
+    description: "Carga datos de ejemplo en la base de datos"
+    schedule: null
+    tags:
+      - seed
+      - setup
+      - database
+
+  etl_taskflow_example:
+    description: "ETL básico usando TaskFlow API"
+    schedule: null
+    tags:
+      - etl
+      - example
+      - taskflow
+    sql_files:
+      extract: include/sql/etl/extract_daily_orders.sql
+
+  postgres_example:
+    description: "Ejemplos de operaciones con PostgreSQL"
+    schedule: null
+    tags:
+      - postgres
+      - example
+      - sql
+
+  conditional_example:
+    description: "Ejemplo de branching condicional"
+    schedule: null
+    tags:
+      - conditional
+      - example
+      - branching
+
+# Paths comunes
+paths:
+  sql_seed: include/sql/seed
+  sql_etl: include/sql/etl
+  sql_analytics: include/sql/analytics
+  config: include/config

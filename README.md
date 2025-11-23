@@ -14,24 +14,38 @@ Repositorio de soluciones de datos usando Apache Airflow y dbt, gestionado con A
 
 ```
 snail-data-solutions/
-├── dags/                    # DAGs de Airflow
-│   ├── default_dag.py      # DAG de ejemplo básico
-│   └── dbt_example_dag.py  # DAG que ejecuta modelos dbt
-├── include/                 # Código compartido y dbt
-│   └── dbt/                # Proyecto dbt
-│       ├── models/         # Modelos de dbt
-│       │   ├── staging/    # Modelos staging
-│       │   └── marts/      # Modelos marts
-│       ├── dbt_project.yml
-│       └── profiles.yml
-├── plugins/                 # Plugins de Airflow
-├── tests/                   # Tests
-│   └── dags/               # Tests de DAGs
-├── Dockerfile              # Imagen base de Astronomer
-├── requirements.txt        # Dependencias Python
-├── packages.txt            # Paquetes del sistema
-├── airflow_settings.yaml   # Configuración local
-└── Makefile               # Comandos útiles
+├── dags/                          # DAGs de Airflow
+│   ├── default_dag.py            # DAG de ejemplo básico
+│   ├── dbt_example_dag.py        # DAG que ejecuta modelos dbt
+│   ├── seed_database.py          # Carga datos de ejemplo
+│   ├── etl_taskflow_example.py   # ETL con TaskFlow API
+│   ├── etl_taskflow_refactored.py # ETL refactorizado (buenas prácticas)
+│   ├── postgres_example.py       # Operaciones PostgreSQL
+│   └── conditional_example.py    # Branching condicional
+├── include/                       # Código compartido
+│   ├── dbt/                      # Proyecto dbt
+│   │   ├── models/
+│   │   │   ├── staging/
+│   │   │   └── marts/
+│   │   ├── dbt_project.yml
+│   │   └── profiles.yml
+│   ├── sql/                      # Queries SQL externalizados
+│   │   ├── seed/                 # Scripts de inicialización
+│   │   │   ├── 01_create_schema.sql
+│   │   │   ├── 02_create_tables.sql
+│   │   │   └── 03_insert_sample_data.sql
+│   │   ├── etl/                  # Queries ETL
+│   │   └── analytics/            # Queries de análisis
+│   └── config/                   # Configuraciones YAML
+│       └── dag_config.yaml       # Configuración de DAGs
+├── plugins/                       # Plugins de Airflow
+├── tests/                         # Tests
+│   └── dags/                     # Tests de DAGs
+├── Dockerfile                     # Imagen base de Astronomer
+├── requirements.txt               # Dependencias Python
+├── packages.txt                   # Paquetes del sistema
+├── airflow_settings.yaml          # Configuración local
+└── Makefile                      # Comandos útiles
 ```
 
 ## 🚀 Quick Start
@@ -57,6 +71,32 @@ astro dev start
 - **URL**: http://localhost:8080
 - **Usuario**: `admin`
 - **Password**: `admin`
+
+### Cargar datos de ejemplo
+
+**IMPORTANTE**: Ejecuta el DAG `seed_database` primero para cargar datos de ejemplo:
+
+1. Ve a http://localhost:8080
+2. Busca el DAG `seed_database`
+3. Actívalo y ejecútalo (Trigger DAG)
+4. Esto crea:
+   - Schema `sample_data`
+   - Tablas: `customers`, `products`, `orders`, `order_items`, `categories`
+   - ~100 clientes, 25 productos, 200 órdenes con datos realistas
+
+Una vez cargados los datos, los otros DAGs pueden trabajar con ellos.
+
+## 📊 Base de Datos de Ejemplo
+
+El schema `sample_data` contiene un e-commerce simplificado:
+
+- **customers**: 100 clientes en diferentes países
+- **categories**: 5 categorías de productos
+- **products**: 25 productos con precios y stock
+- **orders**: 200 órdenes con diferentes estados
+- **order_items**: Detalles de cada orden
+
+Los DAGs de ejemplo (`etl_taskflow_refactored`, `postgres_example`) usan estos datos.
 
 ## 📝 Comandos Útiles
 
@@ -182,6 +222,56 @@ make logs
 make clean
 make start
 ```
+
+## ✨ Buenas Prácticas Implementadas
+
+Este repositorio sigue principios de **DRY** (Don't Repeat Yourself) y **KISS** (Keep It Simple):
+
+### SQL Externalizado
+
+✅ **Queries SQL en archivos separados** (`include/sql/`)
+- Fácil de mantener y versionar
+- Reutilizable entre DAGs
+- Testeable independientemente
+- Git diff más claro
+
+```python
+# Mal ❌
+sql = "SELECT * FROM table WHERE..."
+
+# Bien ✅
+sql = read_sql_file('include/sql/analytics/query.sql')
+```
+
+### Configuración en YAML
+
+✅ **Configuración externalizada** (`include/config/dag_config.yaml`)
+- Un solo lugar para cambiar configuraciones
+- Fácil de entender y modificar
+- Versionable y documentable
+
+```python
+# Cargar config
+with open('include/config/dag_config.yaml') as f:
+    config = yaml.safe_load(f)
+```
+
+### Estructura Organizada
+
+✅ **Separación clara de concerns**:
+- `dags/`: Lógica de orquestación
+- `include/sql/`: Queries SQL
+- `include/config/`: Configuraciones
+- `include/dbt/`: Modelos de transformación
+
+### DAGs como Ejemplos
+
+Cada DAG demuestra un patrón diferente:
+- `seed_database`: Inicialización de datos
+- `etl_taskflow_refactored`: ETL con buenas prácticas
+- `postgres_example`: Operaciones SQL directas
+- `conditional_example`: Lógica condicional
+- `dbt_example_dag`: Transformaciones con dbt
 
 ## 📚 Recursos
 
