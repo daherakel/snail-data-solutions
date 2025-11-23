@@ -80,25 +80,21 @@ SELECT
 FROM generate_series(1, 200)
 ON CONFLICT DO NOTHING;
 
--- Insertar items de orden (1-5 productos por orden)
+-- Insertar items de orden (1-3 productos por orden)
+-- Genera items para cada orden usando productos existentes
 INSERT INTO sample_data.order_items (order_id, product_id, quantity, unit_price)
 SELECT
     o.order_id,
-    (random() * 24 + 1)::INTEGER,
-    (random() * 3 + 1)::INTEGER,
-    p.price
+    p.product_id,
+    (random() * 3 + 1)::INTEGER as quantity,
+    p.price as unit_price
 FROM sample_data.orders o
 CROSS JOIN LATERAL (
-    SELECT price
+    SELECT product_id, price
     FROM sample_data.products
-    WHERE product_id = (random() * 24 + 1)::INTEGER
-    LIMIT 1
+    ORDER BY random()
+    LIMIT (random() * 2 + 1)::INTEGER  -- 1-3 productos por orden
 ) p
-WHERE NOT EXISTS (
-    SELECT 1 FROM sample_data.order_items
-    WHERE order_id = o.order_id
-)
-LIMIT 300
 ON CONFLICT DO NOTHING;
 
 -- Actualizar totales de órdenes
