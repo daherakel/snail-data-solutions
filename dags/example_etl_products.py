@@ -21,7 +21,7 @@ CONFIG_PATH = Path('/usr/local/airflow/include/config/dag_config.yaml')
 with open(CONFIG_PATH) as f:
     config = yaml.safe_load(f)
 
-dag_config = config['dags']['etl_taskflow_example']
+dag_config = config['dags']['example_etl_products']
 default_config = config['default']
 
 
