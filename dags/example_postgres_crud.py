@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 @dag(
-    dag_id='postgres_example',
+    dag_id='example_postgres_crud',
     start_date=datetime(2024, 1, 1),
     schedule=None,
     catchup=False,
@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
         'retry_delay': timedelta(minutes=5),
     },
 )
-def postgres_example():
+def example_postgres_crud():
     """
     DAG que demuestra operaciones con PostgreSQL:
     1. Crear tabla con PostgresOperator
@@ -164,4 +164,4 @@ def postgres_example():
     update_users() >> generate_stats
 
 
-postgres_example()
+example_postgres_crud()

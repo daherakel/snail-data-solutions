@@ -60,13 +60,11 @@ class TestDagValidation:
                 f"DAG {dag_id} no tiene is_paused_upon_creation definido"
 
     @pytest.mark.parametrize("expected_dag", [
-        "default_dag",
-        "dbt_example_dag",
-        "seed_database",
-        "etl_taskflow_example",
-        "etl_taskflow_refactored",
-        "postgres_example",
-        "conditional_example",
+        "setup_sample_database",
+        "example_etl_products",
+        "example_postgres_crud",
+        "example_conditional_branching",
+        "dbt_run_transformations",
     ])
     def test_expected_dag_exists(self, dagbag, expected_dag):
         """Verifica que los DAGs esperados existen"""

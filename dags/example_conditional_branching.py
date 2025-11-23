@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 @dag(
-    dag_id='conditional_example',
+    dag_id='example_conditional_branching',
     start_date=datetime(2024, 1, 1),
     schedule=None,
     catchup=False,
@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
         'retry_delay': timedelta(minutes=5),
     },
 )
-def conditional_example():
+def example_conditional_branching():
     """
     DAG que demuestra branching condicional:
     1. Evalúa una condición
@@ -150,4 +150,4 @@ def conditional_example():
     check_day_of_week() >> [weekday_processing, weekend_processing] >> join_day >> end
 
 
-conditional_example()
+example_conditional_branching()

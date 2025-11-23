@@ -1,0 +1,21 @@
+version: 2
+
+models:
+  - name: stg_example
+    description: "Modelo staging de ejemplo con datos generados"
+    columns:
+      - name: id
+        description: "ID único del registro"
+        tests:
+          - unique
+          - not_null
+
+      - name: name
+        description: "Nombre del registro"
+        tests:
+          - not_null
+
+      - name: created_at
+        description: "Timestamp de creación"
+        tests:
+          - not_null

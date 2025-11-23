@@ -14,14 +14,12 @@ Repositorio de soluciones de datos usando Apache Airflow y dbt, gestionado con A
 
 ```
 snail-data-solutions/
-├── dags/                          # DAGs de Airflow
-│   ├── default_dag.py            # DAG de ejemplo básico
-│   ├── dbt_example_dag.py        # DAG que ejecuta modelos dbt
-│   ├── seed_database.py          # Carga datos de ejemplo
-│   ├── etl_taskflow_example.py   # ETL con TaskFlow API
-│   ├── etl_taskflow_refactored.py # ETL refactorizado (buenas prácticas)
-│   ├── postgres_example.py       # Operaciones PostgreSQL
-│   └── conditional_example.py    # Branching condicional
+├── dags/                                    # DAGs de Airflow
+│   ├── setup_sample_database.py           # Setup: Carga datos de ejemplo
+│   ├── example_etl_products.py            # Ejemplo: ETL de productos
+│   ├── example_postgres_crud.py           # Ejemplo: CRUD con PostgreSQL
+│   ├── example_conditional_branching.py   # Ejemplo: Branching condicional
+│   └── dbt_run_transformations.py         # dbt: Ejecuta transformaciones
 ├── include/                       # Código compartido
 │   ├── dbt/                      # Proyecto dbt
 │   │   ├── models/
@@ -74,10 +72,10 @@ astro dev start
 
 ### Cargar datos de ejemplo
 
-**IMPORTANTE**: Ejecuta el DAG `seed_database` primero para cargar datos de ejemplo:
+**IMPORTANTE**: Ejecuta el DAG `setup_sample_database` primero para cargar datos de ejemplo:
 
 1. Ve a http://localhost:8080
-2. Busca el DAG `seed_database`
+2. Busca el DAG `setup_sample_database`
 3. Actívalo y ejecútalo (Trigger DAG)
 4. Esto crea:
    - Schema `sample_data`
@@ -96,7 +94,7 @@ El schema `sample_data` contiene un e-commerce simplificado:
 - **orders**: 200 órdenes con diferentes estados
 - **order_items**: Detalles de cada orden
 
-Los DAGs de ejemplo (`etl_taskflow_refactored`, `postgres_example`) usan estos datos.
+Los DAGs de ejemplo (`example_etl_products`, `example_postgres_crud`) usan estos datos.
 
 ## 📝 Comandos Útiles
 
@@ -266,12 +264,37 @@ with open('include/config/dag_config.yaml') as f:
 
 ### DAGs como Ejemplos
 
-Cada DAG demuestra un patrón diferente:
-- `seed_database`: Inicialización de datos
-- `etl_taskflow_refactored`: ETL con buenas prácticas
-- `postgres_example`: Operaciones SQL directas
-- `conditional_example`: Lógica condicional
-- `dbt_example_dag`: Transformaciones con dbt
+Cada DAG tiene un nombre descriptivo que indica su propósito:
+
+**Setup:**
+- `setup_sample_database`: Inicializa base de datos con datos de prueba
+
+**Ejemplos:**
+- `example_etl_products`: ETL de productos con buenas prácticas
+- `example_postgres_crud`: Operaciones CRUD con PostgreSQL
+- `example_conditional_branching`: Branching basado en calidad de datos
+
+**dbt:**
+- `dbt_run_transformations`: Ejecuta modelos dbt (debug → run → test)
+
+### dbt Tests
+
+Los modelos dbt incluyen tests de calidad de datos:
+
+```bash
+# Ejecutar tests de dbt
+make dbt-test
+
+# O manualmente
+astro dev bash -c "cd include/dbt && dbt test"
+```
+
+**Tests implementados:**
+- `unique`: Verifica valores únicos en columnas clave
+- `not_null`: Asegura que columnas críticas no sean nulas
+- `expression_is_true`: Valida reglas de negocio personalizadas
+
+Los tests se definen en `include/dbt/models/*/schema.yml`
 
 ## 📚 Recursos
 

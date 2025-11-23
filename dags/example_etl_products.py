@@ -33,7 +33,7 @@ def read_sql_file(filepath: str) -> str:
 
 
 @dag(
-    dag_id='etl_taskflow_refactored',
+    dag_id='example_etl_products',
     start_date=datetime(2024, 1, 1),
     schedule=dag_config['schedule'],
     catchup=False,
@@ -45,7 +45,7 @@ def read_sql_file(filepath: str) -> str:
         'retry_delay': timedelta(minutes=default_config['retry_delay_minutes']),
     },
 )
-def etl_taskflow_refactored():
+def example_etl_products():
     """
     DAG que demuestra un ETL con buenas prácticas:
     1. Configuración externalizada en YAML
@@ -186,4 +186,4 @@ def etl_taskflow_refactored():
     load_task >> validation >> summary
 
 
-etl_taskflow_refactored()
+example_etl_products()

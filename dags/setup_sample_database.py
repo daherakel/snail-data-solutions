@@ -1,8 +1,8 @@
 """
-Database Seed DAG
+Setup Sample Database DAG
 
 Carga datos de ejemplo en PostgreSQL ejecutando scripts SQL.
-Este DAG debe ejecutarse primero para preparar la base de datos.
+Este DAG debe ejecutarse primero para preparar la base de datos con datos de prueba.
 """
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -19,24 +19,24 @@ with open(CONFIG_PATH) as f:
     config = yaml.safe_load(f)
 
 # Configuración del DAG desde YAML
-dag_config = config['dags']['seed_database']
+dag_config = config['dags'].get('setup_sample_database', config['dags'].get('seed_database', {}))
 default_config = config['default']
 
 
 @dag(
-    dag_id='seed_database',
+    dag_id='setup_sample_database',
     start_date=datetime(2024, 1, 1),
-    schedule=dag_config['schedule'],
+    schedule=dag_config.get('schedule'),
     catchup=False,
-    tags=dag_config['tags'],
-    description=dag_config['description'],
+    tags=dag_config.get('tags', ['setup', 'database', 'sample-data']),
+    description=dag_config.get('description', 'Carga datos de ejemplo en la base de datos'),
     default_args={
         'owner': default_config['owner'],
         'retries': default_config['retries'],
         'retry_delay': timedelta(minutes=default_config['retry_delay_minutes']),
     },
 )
-def seed_database():
+def setup_sample_database():
     """
     DAG que inicializa la base de datos con datos de ejemplo.
 
@@ -126,4 +126,4 @@ def seed_database():
     start >> create_schema >> create_tables >> insert_data >> verification >> complete
 
 
-seed_database()
+setup_sample_database()

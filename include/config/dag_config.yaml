@@ -13,39 +13,50 @@ connections:
 
 # Configuración específica por DAG
 dags:
-  seed_database:
+  setup_sample_database:
     description: "Carga datos de ejemplo en la base de datos"
     schedule: null
     tags:
-      - seed
       - setup
       - database
+      - sample-data
 
-  etl_taskflow_example:
-    description: "ETL básico usando TaskFlow API"
+  example_etl_products:
+    description: "ETL de productos usando TaskFlow API y buenas prácticas"
     schedule: null
     tags:
-      - etl
       - example
-      - taskflow
+      - etl
+      - products
+      - best-practices
     sql_files:
       extract: include/sql/etl/extract_daily_orders.sql
 
-  postgres_example:
-    description: "Ejemplos de operaciones con PostgreSQL"
+  example_postgres_crud:
+    description: "Operaciones CRUD con PostgreSQL"
     schedule: null
     tags:
-      - postgres
       - example
+      - postgres
+      - crud
       - sql
 
-  conditional_example:
-    description: "Ejemplo de branching condicional"
+  example_conditional_branching:
+    description: "Branching condicional basado en calidad de datos"
     schedule: null
     tags:
-      - conditional
       - example
+      - conditional
       - branching
+      - data-quality
+
+  dbt_run_transformations:
+    description: "Ejecuta transformaciones de dbt (debug, run, test)"
+    schedule: null
+    tags:
+      - dbt
+      - transformations
+      - data-modeling
 
 # Paths comunes
 paths:

@@ -1,0 +1,32 @@
+version: 2
+
+models:
+  - name: fct_example
+    description: "Modelo de hechos de ejemplo basado en staging"
+    columns:
+      - name: id
+        description: "ID único del registro"
+        tests:
+          - unique
+          - not_null
+
+      - name: name_upper
+        description: "Nombre en mayúsculas"
+        tests:
+          - not_null
+
+      - name: created_at
+        description: "Timestamp de creación original"
+        tests:
+          - not_null
+
+      - name: processed_at
+        description: "Timestamp de procesamiento"
+        tests:
+          - not_null
+
+    tests:
+      - dbt_utils.expression_is_true:
+          expression: "processed_at >= created_at"
+          config:
+            severity: warn

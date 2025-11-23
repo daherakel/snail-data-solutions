@@ -7,7 +7,7 @@ from airflow.operators.bash import BashOperator
 
 
 @dag(
-    dag_id='dbt_example_dag',
+    dag_id='dbt_run_transformations',
     start_date=datetime(2024, 1, 1),
     schedule=None,
     catchup=False,
@@ -18,7 +18,7 @@ from airflow.operators.bash import BashOperator
         'retries': 1,
     },
 )
-def dbt_example_dag():
+def dbt_run_transformations():
     """DAG que ejecuta los modelos de dbt de ejemplo"""
 
     dbt_debug = BashOperator(
@@ -40,4 +40,4 @@ def dbt_example_dag():
     dbt_debug >> dbt_run >> dbt_test
 
 
-dbt_example_dag()
+dbt_run_transformations()
