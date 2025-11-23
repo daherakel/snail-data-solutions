@@ -5,16 +5,18 @@ Repositorio de soluciones de datos usando Apache Airflow y dbt, gestionado con A
 ## 🛠️ Stack Tecnológico
 
 - **Airflow**: 2.10.3 (Astro Runtime 12.5.0)
-- **dbt**: Configurado para PostgreSQL
+- **dbt**: 1.10.15 con adaptador PostgreSQL 1.9.1 (instalado automáticamente)
 - **PostgreSQL**: 13
 - **Astronomer CLI**: Para desarrollo local
+- **Git**: Incluido para operaciones de dbt
 
 ## 📁 Estructura del Proyecto
 
 ```
 snail-data-solutions/
 ├── dags/                    # DAGs de Airflow
-│   └── default_dag.py      # DAG de ejemplo
+│   ├── default_dag.py      # DAG de ejemplo básico
+│   └── dbt_example_dag.py  # DAG que ejecuta modelos dbt
 ├── include/                 # Código compartido y dbt
 │   └── dbt/                # Proyecto dbt
 │       ├── models/         # Modelos de dbt
@@ -87,7 +89,9 @@ make pytest         # Ejecutar tests de Airflow
 
 ## 🔧 Configuración de dbt
 
-El proyecto dbt está configurado en `include/dbt/`. Variables de entorno relevantes en `.env`:
+**dbt viene preinstalado y configurado** automáticamente al levantar el proyecto.
+
+El proyecto dbt está en `include/dbt/` y se conecta a PostgreSQL usando las variables de entorno en `.env`:
 
 ```bash
 DBT_HOST=postgres
@@ -98,24 +102,41 @@ DBT_SCHEMA=public
 DBT_PORT=5432
 ```
 
+### DAG de dbt
+
+`dbt_example_dag` ejecuta automáticamente:
+1. **dbt debug**: Verifica la configuración y conexión
+2. **dbt run**: Materializa los modelos (staging → marts)
+3. **dbt test**: Ejecuta tests de validación
+
 ### Estructura de modelos
 
 - **staging/**: Modelos que limpian y estandarizan datos raw (views)
+  - `stg_example.sql`: Ejemplo de modelo staging
 - **marts/**: Modelos finales para análisis y reporting (tables)
+  - `fct_example.sql`: Ejemplo de tabla de hechos
 
 ## 📦 Agregar Dependencias
 
 ### Python
 
-Editar `requirements.txt` y ejecutar:
+1. Editar `requirements.txt` para dependencias de Python
+2. Ejecutar `astro dev restart`
 
-```bash
-astro dev restart
-```
+**Nota**: dbt-postgres está instalado en el `Dockerfile` para evitar conflictos de dependencias.
 
 ### Sistema
 
-Editar `packages.txt` con paquetes de Ubuntu y reiniciar.
+1. Editar `packages.txt` con paquetes de Ubuntu (ej: `git`)
+2. Ejecutar `astro dev restart`
+
+### dbt
+
+Para actualizar la versión de dbt, editar la línea correspondiente en el `Dockerfile`:
+
+```dockerfile
+RUN pip install --no-cache-dir "dbt-postgres>=1.9.0,<2.0.0"
+```
 
 ## 🧪 Desarrollo
 
