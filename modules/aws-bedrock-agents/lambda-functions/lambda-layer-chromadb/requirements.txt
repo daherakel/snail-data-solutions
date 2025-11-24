@@ -1,5 +1,14 @@
-# Requirements for ChromaDB Lambda Layer
-# Este layer se compila y sube por separado
+# Requirements for FAISS Lambda Layer
+# Dependencias ligeras para vector search en Lambda
 
-chromadb==0.4.22
-pydantic==2.5.0
+# FAISS for vector similarity search (CPU version for Lambda)
+faiss-cpu==1.7.4
+
+# PDF processing
+PyPDF2==3.0.1
+
+# AWS SDK
+boto3==1.34.34
+
+# Numerical operations (required by FAISS)
+numpy==1.24.3

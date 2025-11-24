@@ -1,35 +1,33 @@
 """
 Lambda Function: Query Handler
-Procesa queries, busca contexto en ChromaDB y genera respuestas con RAG usando Bedrock
+Procesa queries, busca contexto en FAISS y genera respuestas con RAG usando Bedrock
 """
 
 import json
 import os
-import tarfile
+import pickle
 from typing import Dict, List, Any
 
 import boto3
+import numpy as np
 
-# Imports de ChromaDB (desde Lambda Layer)
-import chromadb
-from chromadb.config import Settings
+# FAISS for vector search (desde Lambda Layer)
+import faiss
 
 # Configuración desde variables de entorno
 ENVIRONMENT = os.environ.get('ENVIRONMENT', 'dev')
-CHROMADB_BACKUP_BUCKET = os.environ['CHROMADB_BACKUP_BUCKET']
-CHROMADB_BACKUP_KEY = os.environ.get('CHROMADB_BACKUP_KEY', 'chromadb_data.tar.gz')
+FAISS_BACKUP_BUCKET = os.environ['FAISS_BACKUP_BUCKET']
+FAISS_INDEX_KEY = os.environ.get('FAISS_INDEX_KEY', 'faiss_index.bin')
+FAISS_METADATA_KEY = os.environ.get('FAISS_METADATA_KEY', 'faiss_metadata.pkl')
 BEDROCK_EMBEDDING_MODEL_ID = os.environ.get('BEDROCK_EMBEDDING_MODEL_ID', 'amazon.titan-embed-text-v1')
 BEDROCK_LLM_MODEL_ID = os.environ.get('BEDROCK_LLM_MODEL_ID', 'anthropic.claude-3-haiku-20240307-v1:0')
-AWS_REGION = os.environ.get('AWS_REGION', 'us-east-1')
+AWS_REGION = os.environ.get('AWS_DEFAULT_REGION', 'us-east-1')
 LOG_LEVEL = os.environ.get('LOG_LEVEL', 'INFO')
 MAX_CONTEXT_CHUNKS = int(os.environ.get('MAX_CONTEXT_CHUNKS', '5'))
 
 # Clientes AWS
 s3_client = boto3.client('s3', region_name=AWS_REGION)
 bedrock_client = boto3.client('bedrock-runtime', region_name=AWS_REGION)
-
-# ChromaDB temp directory
-CHROMA_PERSIST_DIR = '/tmp/chroma'
 
 
 def setup_logging():
@@ -45,43 +43,45 @@ def setup_logging():
 logger = setup_logging()
 
 
-def load_chroma_from_s3() -> chromadb.Client:
+def load_faiss_from_s3():
     """
-    Carga ChromaDB desde S3
+    Carga FAISS index y metadata desde S3
+    Returns: (faiss_index, metadata_list)
     """
     try:
-        logger.info(f"Cargando ChromaDB desde s3://{CHROMADB_BACKUP_BUCKET}/{CHROMADB_BACKUP_KEY}")
+        logger.info(f"Cargando FAISS index desde s3://{FAISS_BACKUP_BUCKET}/{FAISS_INDEX_KEY}")
 
-        # Descargar backup desde S3
-        backup_path = '/tmp/chroma_backup.tar.gz'
-        s3_client.download_file(CHROMADB_BACKUP_BUCKET, CHROMADB_BACKUP_KEY, backup_path)
+        # Descargar index desde S3
+        index_path = '/tmp/faiss_index.bin'
+        s3_client.download_file(FAISS_BACKUP_BUCKET, FAISS_INDEX_KEY, index_path)
 
-        # Extraer
-        with tarfile.open(backup_path, 'r:gz') as tar:
-            tar.extractall('/tmp/')
+        # Cargar index
+        index = faiss.read_index(index_path)
 
-        logger.info("ChromaDB cargado exitosamente")
+        # Descargar metadata
+        metadata_path = '/tmp/faiss_metadata.pkl'
+        s3_client.download_file(FAISS_BACKUP_BUCKET, FAISS_METADATA_KEY, metadata_path)
+
+        with open(metadata_path, 'rb') as f:
+            metadata = pickle.load(f)
+
+        logger.info(f"FAISS cargado: {index.ntotal} vectores, {len(metadata)} metadatas")
+
+        return index, metadata
 
     except s3_client.exceptions.NoSuchKey:
-        logger.warning("No existe backup de ChromaDB, la base está vacía")
+        logger.warning("No existe FAISS index en S3")
         raise ValueError("No hay documentos indexados aún. Primero sube documentos al bucket raw.")
 
     except Exception as e:
-        logger.error(f"Error cargando ChromaDB desde S3: {e}")
+        logger.error(f"Error cargando FAISS desde S3: {e}")
         raise
 
-    # Crear cliente
-    client = chromadb.Client(Settings(
-        chroma_db_impl="duckdb+parquet",
-        persist_directory=CHROMA_PERSIST_DIR
-    ))
 
-    return client
-
-
-def generate_embedding(text: str) -> List[float]:
+def generate_embedding(text: str) -> np.ndarray:
     """
     Genera embedding usando Bedrock Titan
+    Returns: numpy array
     """
     try:
         response = bedrock_client.invoke_model(
@@ -90,7 +90,7 @@ def generate_embedding(text: str) -> List[float]:
         )
 
         result = json.loads(response['body'].read())
-        embedding = result['embedding']
+        embedding = np.array([result['embedding']], dtype=np.float32)
 
         return embedding
 
@@ -100,41 +100,38 @@ def generate_embedding(text: str) -> List[float]:
 
 
 def search_similar_chunks(
-    chroma_client: chromadb.Client,
+    faiss_index: faiss.Index,
+    metadata_list: List[Dict[str, Any]],
     query: str,
     top_k: int = 5
 ) -> List[Dict[str, Any]]:
     """
-    Busca chunks similares en ChromaDB
+    Busca chunks similares en FAISS
     """
     logger.info(f"Buscando contexto relevante para: '{query}'")
 
-    # Obtener colección
-    try:
-        collection = chroma_client.get_collection(name="documents")
-    except Exception:
-        logger.error("Colección 'documents' no existe")
+    if faiss_index.ntotal == 0:
+        logger.error("FAISS index está vacío")
         return []
 
     # Generar embedding de la query
     query_embedding = generate_embedding(query)
 
-    # Buscar en ChromaDB
-    results = collection.query(
-        query_embeddings=[query_embedding],
-        n_results=top_k,
-        include=['documents', 'metadatas', 'distances']
-    )
+    # Buscar en FAISS (retorna distances y indices)
+    distances, indices = faiss_index.search(query_embedding, min(top_k, faiss_index.ntotal))
 
     # Formatear resultados
     chunks = []
-    if results['ids'] and results['ids'][0]:
-        for i in range(len(results['ids'][0])):
+    for i, idx in enumerate(indices[0]):
+        if idx < len(metadata_list):  # Validar índice
             chunks.append({
-                'id': results['ids'][0][i],
-                'text': results['documents'][0][i],
-                'metadata': results['metadatas'][0][i],
-                'distance': results['distances'][0][i]
+                'id': idx,
+                'text': metadata_list[idx]['text'],
+                'metadata': {
+                    'source': metadata_list[idx]['source'],
+                    'chunk_id': metadata_list[idx]['chunk_id']
+                },
+                'distance': float(distances[0][i])  # L2 distance
             })
 
     logger.info(f"Encontrados {len(chunks)} chunks relevantes")
@@ -196,7 +193,7 @@ Respuesta:"""
 
         return {
             'answer': answer,
-            'sources': [chunk['metadata']['source'] for chunk in context_chunks],
+            'sources': list(set([chunk['metadata']['source'] for chunk in context_chunks])),
             'num_chunks_used': len(context_chunks)
         }
 
@@ -234,12 +231,13 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         if not query:
             raise ValueError("Evento debe contener 'query'")
 
-        # 1. Cargar ChromaDB desde S3
-        chroma_client = load_chroma_from_s3()
+        # 1. Cargar FAISS index desde S3
+        faiss_index, metadata_list = load_faiss_from_s3()
 
         # 2. Buscar chunks relevantes
         context_chunks = search_similar_chunks(
-            chroma_client,
+            faiss_index,
+            metadata_list,
             query,
             top_k=MAX_CONTEXT_CHUNKS
         )

@@ -62,10 +62,10 @@ resource "aws_lambda_function" "pdf_processor" {
       ENVIRONMENT                = var.environment
       RAW_BUCKET                 = var.raw_documents_bucket_name
       PROCESSED_BUCKET           = var.processed_documents_bucket_name
-      CHROMADB_BACKUP_BUCKET     = var.chromadb_backup_bucket_name
-      CHROMADB_BACKUP_KEY        = "chromadb_data.tar.gz"
+      FAISS_BACKUP_BUCKET        = var.chromadb_backup_bucket_name
+      FAISS_INDEX_KEY            = "faiss_index.bin"
+      FAISS_METADATA_KEY         = "faiss_metadata.pkl"
       BEDROCK_EMBEDDING_MODEL_ID = "amazon.titan-embed-text-v1"
-      AWS_REGION                 = var.aws_region
       LOG_LEVEL                  = var.log_level
     }
   }
@@ -121,11 +121,11 @@ resource "aws_lambda_function" "query_handler" {
   environment {
     variables = {
       ENVIRONMENT                = var.environment
-      CHROMADB_BACKUP_BUCKET     = var.chromadb_backup_bucket_name
-      CHROMADB_BACKUP_KEY        = "chromadb_data.tar.gz"
+      FAISS_BACKUP_BUCKET        = var.chromadb_backup_bucket_name
+      FAISS_INDEX_KEY            = "faiss_index.bin"
+      FAISS_METADATA_KEY         = "faiss_metadata.pkl"
       BEDROCK_EMBEDDING_MODEL_ID = "amazon.titan-embed-text-v1"
       BEDROCK_LLM_MODEL_ID       = var.bedrock_llm_model_id
-      AWS_REGION                 = var.aws_region
       LOG_LEVEL                  = var.log_level
       MAX_CONTEXT_CHUNKS         = var.max_context_chunks
     }

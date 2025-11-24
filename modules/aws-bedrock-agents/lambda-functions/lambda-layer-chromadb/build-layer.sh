@@ -11,11 +11,14 @@ rm -rf python/ chromadb-layer.zip
 # Crear directorio python/ (requerido por Lambda)
 mkdir -p python
 
-# Instalar dependencias usando Docker (para compatibilidad con Lambda runtime)
+# Instalar dependencias usando Docker con compiladores (para ChromaDB)
 docker run --rm \
   -v "$(pwd)":/var/task \
-  public.ecr.aws/lambda/python:3.11 \
-  pip install -r requirements.txt -t python/
+  -w /var/task \
+  amazonlinux:2023 \
+  bash -c "yum install -y python3.11 python3.11-pip gcc python3.11-devel && \
+           python3.11 -m pip install --upgrade pip && \
+           python3.11 -m pip install -r requirements.txt -t python/ --no-cache-dir"
 
 # Comprimir
 echo "📦 Comprimiendo layer..."

@@ -1,8 +1,57 @@
-# CLAUDE.md - Instrucciones del Proyecto Snail Data Solutions
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+---
+
+# Instrucciones del Proyecto Snail Data Solutions
 
 ## Sobre Snail Data Solutions
 
 **Snail Data Solutions** es una consultora especializada en Data Engineering y AI. Este repositorio contiene soluciones, proyectos, templates y playgrounds reutilizables para acelerar implementaciones de clientes y servir como base de conocimiento.
+
+## Quick Reference
+
+### Common Commands (Airflow Module)
+```bash
+# Working directory
+cd modules/airflow-orchestration
+
+# Core operations
+make start          # Start Airflow (http://localhost:8080, admin/admin)
+make stop           # Stop Airflow
+make logs           # View all logs
+make shell          # Open shell in container
+
+# dbt operations
+make dbt-run        # Run dbt models
+make dbt-test       # Run dbt tests
+make dbt-debug      # Verify dbt configuration
+
+# Testing
+make pytest         # Run Airflow tests
+
+# Single test
+astro dev pytest tests/dags/test_specific_dag.py
+```
+
+### Architecture at a Glance
+- **Airflow Orchestration Module**: `modules/airflow-orchestration/`
+  - DAGs: `dags/` (setup_*, example_*, dbt_*)
+  - dbt models: `include/dbt/models/` (staging/, marts/)
+  - SQL queries: `include/sql/`
+  - Config: `include/config/`
+
+- **AWS Bedrock Module**: `modules/aws-bedrock-agents/` (in development)
+  - Infrastructure: `infrastructure/terraform/`
+  - Lambda functions: `lambda-functions/`
+  - Docs: `docs/aws-bedrock-agents/`
+
+### Key Files to Read First
+- This file (CLAUDE.md) for project context
+- `modules/airflow-orchestration/README.md` for Airflow setup
+- `modules/aws-bedrock-agents/README.md` for Bedrock module
+- `docs/aws-bedrock-agents/COST_ANALYSIS.md` for AWS cost estimates
 
 ## Objetivo del Repositorio
 
@@ -308,15 +357,116 @@ Los DAGs se pueden activar/desactivar individualmente en la UI de Airflow o medi
 
 ## Instrucciones para Claude
 
+### Typical Development Workflows
+
+#### Adding a New DAG
+1. Read existing DAGs in `modules/airflow-orchestration/dags/` to understand patterns
+2. Create new DAG file with appropriate prefix (setup_*, example_*, etl_*, etc.)
+3. Externalize SQL queries to `include/sql/`
+4. Externalize configuration to `include/config/` (YAML)
+5. Add test in `tests/dags/test_your_dag.py`
+6. Run: `cd modules/airflow-orchestration && make start`
+7. Verify DAG appears in UI at http://localhost:8080
+8. Run tests: `make pytest`
+
+#### Adding a dbt Model
+1. Navigate to `modules/airflow-orchestration/include/dbt/models/`
+2. Create staging model in `staging/stg_{source}_{entity}.sql`
+3. Create mart model in `marts/{fct|dim}_{description}.sql`
+4. Add tests in corresponding `schema.yml` file (unique, not_null minimum)
+5. Run: `make dbt-run` to materialize
+6. Run: `make dbt-test` to validate
+7. Update documentation in schema.yml
+
+#### Modifying AWS Bedrock Infrastructure
+1. Read existing Terraform modules in `modules/aws-bedrock-agents/infrastructure/terraform/modules/`
+2. Review cost analysis first: `docs/aws-bedrock-agents/COST_ANALYSIS.md`
+3. Modify Terraform module or create new one
+4. Update variables in `environments/dev/variables.tf`
+5. Plan: `terraform plan` from environment directory
+6. Apply: `terraform apply` (with user confirmation)
+7. Document changes in module README and update costs if applicable
+
+#### Running Single Test
+```bash
+cd modules/airflow-orchestration
+astro dev pytest tests/dags/test_specific_dag.py::test_function_name -v
+```
+
+#### Debugging a DAG Issue
+1. Check scheduler logs: `make logs-scheduler`
+2. Verify DAG syntax: `astro dev bash -c "python dags/your_dag.py"`
+3. Check Airflow UI for import errors
+4. Verify SQL files exist in `include/sql/`
+5. Check database connection: `make dbt-debug`
+
+### Code Patterns to Follow
+
+**SQL Externalization Pattern:**
+```python
+# Read SQL from file (see example DAGs)
+def read_sql_file(filepath):
+    with open(filepath, 'r') as f:
+        return f.read()
+
+# Usage in DAG
+sql = read_sql_file('include/sql/analytics/query.sql')
+```
+
+**YAML Configuration Pattern:**
+```python
+# Load config from YAML (see example DAGs)
+import yaml
+
+with open('include/config/dag_config.yaml') as f:
+    config = yaml.safe_load(f)
+
+# Access config values
+schedule = config['dag']['schedule']
+```
+
+**dbt Model Pattern:**
+```sql
+-- Staging: stg_source_entity.sql (materialized as view)
+-- Clean and standardize raw data
+with source as (
+    select * from {{ source('postgres', 'raw_table') }}
+)
+select
+    id,
+    lower(trim(name)) as name_clean,
+    created_at
+from source
+
+-- Marts: fct_entity.sql (materialized as table)
+-- Business logic and aggregations
+select
+    d.id,
+    d.name_clean,
+    count(*) as total_count
+from {{ ref('stg_source_entity') }} d
+group by 1, 2
+```
+
+**Airflow Connection Pattern:**
+```python
+# Use Airflow connections, not hardcoded credentials
+from airflow.providers.postgres.hooks.postgres import PostgresHook
+
+pg_hook = PostgresHook(postgres_conn_id='postgres_default')
+```
+
 ### Al Trabajar en Este Proyecto
 
 1. **SIEMPRE lee el código existente antes de modificar**
-   - Entiende los patrones actuales
+   - Entiende los patrones actuales mostrados arriba
    - Mantén consistencia con el estilo existente
+   - Busca ejemplos similares en `dags/example_*.py`
 
 2. **Sigue los principios del proyecto**
    - Revisa la sección "Principios y Valores" antes de proponer cambios
    - Optimiza para reusabilidad y escalabilidad
+   - Aplica los patrones de código establecidos
 
 3. **Mantén la modularidad**
    - Cada DAG debe ser independiente
@@ -371,6 +521,73 @@ Los DAGs se pueden activar/desactivar individualmente en la UI de Airflow o medi
 - Se agreguen nuevas dependencias
 - Cambien los pasos de setup
 - Se agreguen nuevos DAGs relevantes
+
+### Common Issues and Solutions
+
+**Issue: DAG not appearing in Airflow UI**
+```bash
+# Check scheduler logs for import errors
+make logs-scheduler
+
+# Verify DAG syntax
+astro dev bash -c "python dags/your_dag.py"
+
+# Common causes:
+# - Syntax errors in DAG file
+# - Missing dependencies in requirements.txt
+# - Import errors (missing modules)
+```
+
+**Issue: dbt models failing**
+```bash
+# Verify dbt connection
+make dbt-debug
+
+# Check compiled SQL
+make dbt-compile
+
+# Common causes:
+# - Database connection issues (check .env)
+# - Missing source tables (run setup_sample_database DAG first)
+# - Invalid Jinja syntax in models
+# - Missing dependencies in dbt_project.yml
+```
+
+**Issue: "Permission denied" or database connection errors**
+```bash
+# Verify environment variables
+astro dev bash -c "env | grep DBT"
+
+# Restart Airflow to reload .env
+make restart
+
+# Common causes:
+# - .env file not loaded
+# - PostgreSQL container not running
+# - Incorrect credentials in .env
+```
+
+**Issue: Changes not reflected after editing code**
+```bash
+# For DAG changes: Wait ~30 seconds (auto-reload)
+# For include/ changes: Restart required
+make restart
+
+# For dbt changes: Recompile
+make dbt-compile
+```
+
+**Issue: Docker resource issues**
+```bash
+# Clean up Docker resources
+make clean
+
+# Remove all volumes and start fresh
+docker system prune -a --volumes
+
+# Restart from scratch
+make start
+```
 
 ## Estado Actual del Proyecto
 
@@ -459,6 +676,6 @@ make clean              # Limpiar todo y empezar fresh
 
 ---
 
-**Última actualización**: 2025-11-23
+**Última actualización**: 2025-11-24
 **Mantenedor**: Snail Data Solutions
-**Versión**: 1.0.0
+**Versión**: 1.1.0

@@ -1,37 +1,37 @@
 """
 Lambda Function: PDF Processor
-Procesa PDFs, extrae texto, genera embeddings con Bedrock y guarda en ChromaDB
+Procesa PDFs, extrae texto, genera embeddings con Bedrock y guarda en FAISS index
 """
 
 import json
 import os
-import tarfile
-import tempfile
+import pickle
 from typing import Dict, List, Any
 
 import boto3
 from PyPDF2 import PdfReader
+import numpy as np
 
-# Imports de ChromaDB (desde Lambda Layer)
-import chromadb
-from chromadb.config import Settings
+# FAISS for vector search (desde Lambda Layer)
+import faiss
 
 # Configuración desde variables de entorno
 ENVIRONMENT = os.environ.get('ENVIRONMENT', 'dev')
 RAW_BUCKET = os.environ['RAW_BUCKET']
 PROCESSED_BUCKET = os.environ['PROCESSED_BUCKET']
-CHROMADB_BACKUP_BUCKET = os.environ['CHROMADB_BACKUP_BUCKET']
-CHROMADB_BACKUP_KEY = os.environ.get('CHROMADB_BACKUP_KEY', 'chromadb_data.tar.gz')
+FAISS_BACKUP_BUCKET = os.environ['FAISS_BACKUP_BUCKET']
+FAISS_INDEX_KEY = os.environ.get('FAISS_INDEX_KEY', 'faiss_index.bin')
+FAISS_METADATA_KEY = os.environ.get('FAISS_METADATA_KEY', 'faiss_metadata.pkl')
 BEDROCK_EMBEDDING_MODEL_ID = os.environ.get('BEDROCK_EMBEDDING_MODEL_ID', 'amazon.titan-embed-text-v1')
-AWS_REGION = os.environ.get('AWS_REGION', 'us-east-1')
+AWS_REGION = os.environ.get('AWS_DEFAULT_REGION', 'us-east-1')
 LOG_LEVEL = os.environ.get('LOG_LEVEL', 'INFO')
 
 # Clientes AWS
 s3_client = boto3.client('s3', region_name=AWS_REGION)
 bedrock_client = boto3.client('bedrock-runtime', region_name=AWS_REGION)
 
-# ChromaDB temp directory
-CHROMA_PERSIST_DIR = '/tmp/chroma'
+# Dimensión de embeddings de Titan
+EMBEDDING_DIMENSION = 1536
 
 
 def setup_logging():
@@ -47,56 +47,66 @@ def setup_logging():
 logger = setup_logging()
 
 
-def load_chroma_from_s3() -> chromadb.Client:
+def load_faiss_from_s3():
     """
-    Carga ChromaDB desde S3 si existe, sino crea nuevo
+    Carga FAISS index y metadata desde S3 si existe, sino crea nuevo
+    Returns: (faiss_index, metadata_list)
     """
     try:
-        logger.info(f"Intentando cargar ChromaDB desde s3://{CHROMADB_BACKUP_BUCKET}/{CHROMADB_BACKUP_KEY}")
+        logger.info(f"Intentando cargar FAISS index desde s3://{FAISS_BACKUP_BUCKET}/{FAISS_INDEX_KEY}")
 
-        # Descargar backup desde S3
-        backup_path = '/tmp/chroma_backup.tar.gz'
-        s3_client.download_file(CHROMADB_BACKUP_BUCKET, CHROMADB_BACKUP_KEY, backup_path)
+        # Descargar index desde S3
+        index_path = '/tmp/faiss_index.bin'
+        s3_client.download_file(FAISS_BACKUP_BUCKET, FAISS_INDEX_KEY, index_path)
 
-        # Extraer
-        with tarfile.open(backup_path, 'r:gz') as tar:
-            tar.extractall('/tmp/')
+        # Cargar index
+        index = faiss.read_index(index_path)
 
-        logger.info("ChromaDB cargado exitosamente desde S3")
+        # Descargar metadata
+        metadata_path = '/tmp/faiss_metadata.pkl'
+        s3_client.download_file(FAISS_BACKUP_BUCKET, FAISS_METADATA_KEY, metadata_path)
+
+        with open(metadata_path, 'rb') as f:
+            metadata = pickle.load(f)
+
+        logger.info(f"FAISS index cargado: {index.ntotal} vectores")
+
+        return index, metadata
 
     except s3_client.exceptions.NoSuchKey:
-        logger.info("No existe backup previo de ChromaDB, creando nuevo")
+        logger.info("No existe backup previo de FAISS, creando nuevo index")
     except Exception as e:
-        logger.warning(f"Error cargando ChromaDB desde S3: {e}, creando nuevo")
+        logger.warning(f"Error cargando FAISS desde S3: {e}, creando nuevo index")
 
-    # Crear o cargar cliente
-    client = chromadb.Client(Settings(
-        chroma_db_impl="duckdb+parquet",
-        persist_directory=CHROMA_PERSIST_DIR
-    ))
+    # Crear nuevo index (IndexFlatL2 para búsqueda exacta con L2 distance)
+    index = faiss.IndexFlatL2(EMBEDDING_DIMENSION)
+    metadata = []
 
-    return client
+    return index, metadata
 
 
-def persist_chroma_to_s3(client: chromadb.Client):
+def persist_faiss_to_s3(index: faiss.Index, metadata: List[Dict[str, Any]]):
     """
-    Persiste ChromaDB a S3
+    Persiste FAISS index y metadata a S3
     """
     try:
-        logger.info("Persistiendo ChromaDB a S3...")
+        logger.info("Persistiendo FAISS index a S3...")
 
-        # Comprimir directorio de ChromaDB
-        backup_path = '/tmp/chroma_backup.tar.gz'
-        with tarfile.open(backup_path, 'w:gz') as tar:
-            tar.add(CHROMA_PERSIST_DIR, arcname='chroma')
+        # Guardar index
+        index_path = '/tmp/faiss_index.bin'
+        faiss.write_index(index, index_path)
+        s3_client.upload_file(index_path, FAISS_BACKUP_BUCKET, FAISS_INDEX_KEY)
 
-        # Subir a S3
-        s3_client.upload_file(backup_path, CHROMADB_BACKUP_BUCKET, CHROMADB_BACKUP_KEY)
+        # Guardar metadata
+        metadata_path = '/tmp/faiss_metadata.pkl'
+        with open(metadata_path, 'wb') as f:
+            pickle.dump(metadata, f)
+        s3_client.upload_file(metadata_path, FAISS_BACKUP_BUCKET, FAISS_METADATA_KEY)
 
-        logger.info(f"ChromaDB persistido exitosamente a s3://{CHROMADB_BACKUP_BUCKET}/{CHROMADB_BACKUP_KEY}")
+        logger.info(f"FAISS persistido: s3://{FAISS_BACKUP_BUCKET}/ ({index.ntotal} vectores)")
 
     except Exception as e:
-        logger.error(f"Error persistiendo ChromaDB a S3: {e}")
+        logger.error(f"Error persistiendo FAISS a S3: {e}")
         raise
 
 
@@ -150,9 +160,10 @@ def chunk_text(text: str, chunk_size: int = 1000, overlap: int = 200) -> List[Di
     return chunks
 
 
-def generate_embedding(text: str) -> List[float]:
+def generate_embedding(text: str) -> np.ndarray:
     """
     Genera embedding usando Bedrock Titan
+    Returns: numpy array de dimensión EMBEDDING_DIMENSION
     """
     try:
         response = bedrock_client.invoke_model(
@@ -161,7 +172,7 @@ def generate_embedding(text: str) -> List[float]:
         )
 
         result = json.loads(response['body'].read())
-        embedding = result['embedding']
+        embedding = np.array(result['embedding'], dtype=np.float32)
 
         return embedding
 
@@ -171,46 +182,41 @@ def generate_embedding(text: str) -> List[float]:
 
 
 def index_document(
-    chroma_client: chromadb.Client,
+    faiss_index: faiss.Index,
+    metadata_list: List[Dict[str, Any]],
     doc_id: str,
     chunks: List[Dict[str, Any]]
 ) -> Dict[str, Any]:
     """
-    Indexa documento en ChromaDB
+    Indexa documento en FAISS
     """
     logger.info(f"Indexando documento {doc_id} con {len(chunks)} chunks")
 
-    # Obtener o crear colección
-    collection = chroma_client.get_or_create_collection(
-        name="documents",
-        metadata={"hnsw:space": "cosine"}
-    )
-
     # Procesar cada chunk
+    embeddings = []
     for chunk in chunks:
-        chunk_id = f"{doc_id}_{chunk['id']}"
-
         # Generar embedding
         embedding = generate_embedding(chunk['text'])
+        embeddings.append(embedding)
 
-        # Agregar a ChromaDB
-        collection.add(
-            embeddings=[embedding],
-            documents=[chunk['text']],
-            metadatas=[{
-                "source": doc_id,
-                "chunk_id": chunk['id'],
-                "start": chunk['start'],
-                "end": chunk['end']
-            }],
-            ids=[chunk_id]
-        )
+        # Agregar metadata
+        metadata_list.append({
+            "source": doc_id,
+            "chunk_id": chunk['id'],
+            "text": chunk['text'],
+            "start": chunk['start'],
+            "end": chunk['end']
+        })
 
-    # Obtener stats de la colección
+    # Convertir a numpy array y agregar a FAISS
+    embeddings_array = np.array(embeddings, dtype=np.float32)
+    faiss_index.add(embeddings_array)
+
+    # Stats
     stats = {
         'document_id': doc_id,
         'chunks_indexed': len(chunks),
-        'total_documents': collection.count()
+        'total_vectors': faiss_index.ntotal
     }
 
     logger.info(f"Documento indexado: {stats}")
@@ -254,8 +260,8 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         if not bucket or not key:
             raise ValueError("Evento debe contener 'bucket' y 'key'")
 
-        # 1. Cargar ChromaDB desde S3
-        chroma_client = load_chroma_from_s3()
+        # 1. Cargar FAISS index desde S3
+        faiss_index, metadata_list = load_faiss_from_s3()
 
         # 2. Extraer texto del PDF
         text = extract_text_from_pdf(bucket, key)
@@ -263,12 +269,12 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         # 3. Dividir en chunks
         chunks = chunk_text(text)
 
-        # 4. Indexar en ChromaDB
+        # 4. Indexar en FAISS
         doc_id = key.replace('/', '_').replace('.pdf', '')
-        stats = index_document(chroma_client, doc_id, chunks)
+        stats = index_document(faiss_index, metadata_list, doc_id, chunks)
 
-        # 5. Persistir ChromaDB a S3
-        persist_chroma_to_s3(chroma_client)
+        # 5. Persistir FAISS a S3
+        persist_faiss_to_s3(faiss_index, metadata_list)
 
         # 6. Guardar metadata
         metadata = {
