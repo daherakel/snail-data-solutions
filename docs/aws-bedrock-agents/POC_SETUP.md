@@ -10,22 +10,22 @@ Crear un agente de AI funcional para probar capacidades sin gastos significativo
 - Validación de arquitectura
 - Testing de funcionalidad
 
-## 💰 Costo Total Estimado: **$3-8/mes**
+## 💰 Costo Total Estimado: **$0.50-3/mes**
 
 | Servicio | Configuración | Costo Mensual |
 |----------|---------------|---------------|
 | Bedrock (Claude Haiku) | 100 queries/mes | $0.50 |
-| Vector Store (Pinecone Free) | Hasta 1M vectors | $0.00 |
+| Vector Store (ChromaDB) | Open source, sin límites | $0.00 |
 | Lambda | Dentro de free tier | $0.00 |
-| S3 | Dentro de free tier | $0.00 |
+| S3 | Backup ChromaDB (<1GB) | $0.02 |
 | Step Functions | Dentro de free tier | $0.00 |
 | EventBridge | Dentro de free tier | $0.00 |
-| **TOTAL** | | **~$0.50 - $2/mes** |
+| **TOTAL** | | **~$0.52/mes** ✅ |
 
 ### Escenario con más uso:
 - 500 queries/mes: $2.50
-- 50 documentos/mes: +$0.50
-- **Total: $3-5/mes**
+- 50 documentos/mes: +$0.02 (S3)
+- **Total: $2.52/mes** ✅
 
 ## ⚙️ Stack Recomendado para POC
 
@@ -43,16 +43,20 @@ Crear un agente de AI funcional para probar capacidades sin gastos significativo
 - 100 queries: **$0.088** (~9 centavos)
 - 1,000 queries: **$0.88** (~88 centavos)
 
-### 2. Vector Store: Pinecone Free Tier
+### 2. Vector Store: ChromaDB (Open Source)
 
-**Por qué Pinecone:**
-- **Completamente GRATIS** hasta 1M vectors
-- ~5,000 documentos de tamaño medio
-- Suficiente para POC
-- Fácil de implementar
+**Por qué ChromaDB:**
+- **100% GRATIS** - Open source (Apache 2.0)
+- **Sin límites** de vectores
+- Súper fácil de implementar (API simple)
+- Corre en Lambda (free tier)
+- Persistencia en S3 ($0.02/mes)
+- Migración fácil a ECS/Fargate para producción
 
-**Alternativa (si Pinecone se queda corto):**
-- FAISS local en Lambda: Gratis, solo pagas Lambda execution
+**Alternativas gratuitas:**
+- FAISS: Más rápido, más bajo nivel
+- Qdrant local: Para desarrollo en tu laptop
+- Ver `docs/aws-bedrock-agents/FREE_VECTOR_DB_OPTIONS.md` para detalles
 
 ### 3. Procesamiento: Lambda + PyPDF2
 
@@ -89,59 +93,66 @@ Crear un agente de AI funcional para probar capacidades sin gastos significativo
 └──────┬──────┘
        │
        ▼
-┌─────────────────────────────────────┐
-│  S3 Bucket (documentos)             │
-│  - PDFs digitales únicamente        │
-│  - No usar Textract (gratis)        │
-└──────┬──────────────────────────────┘
+┌─────────────────────────────────────────┐
+│  S3 Bucket (documentos)                 │
+│  - PDFs digitales únicamente            │
+│  - No usar Textract (gratis)            │
+└──────┬──────────────────────────────────┘
        │ trigger
        ▼
-┌─────────────────────────────────────┐
-│  Lambda: PDF Processor              │
-│  - PyPDF2/pdfplumber (gratis)       │
-│  - Extrae texto                     │
-│  - Chunking simple                  │
-└──────┬──────────────────────────────┘
+┌──────────────────────────────────────────┐
+│  Lambda: PDF Processor                   │
+│  ┌────────────────────────────────────┐  │
+│  │ ChromaDB (in-memory)               │  │
+│  │ - Carga desde S3                   │  │
+│  │ - Procesa + indexa                 │  │
+│  │ - Guarda a S3                      │  │
+│  └────────────────────────────────────┘  │
+│  - PyPDF2 (gratis)                       │
+│  - Bedrock embeddings                    │
+└──────────────────────────────────────────┘
        │
        ▼
-┌─────────────────────────────────────┐
-│  Bedrock: Titan Embeddings          │
-│  - $0.0001 por 1K tokens            │
-│  - Genera vectors                   │
-└──────┬──────────────────────────────┘
+┌─────────────────────────────────────────┐
+│  S3 Bucket (chroma_backup/)             │
+│  - ChromaDB data comprimida             │
+│  - $0.02/mes                            │
+└─────────────────────────────────────────┘
+       ▲
        │
-       ▼
-┌─────────────────────────────────────┐
-│  Pinecone Free Tier                 │
-│  - 1M vectors gratis                │
-│  - ~5K documentos                   │
-└─────────────────────────────────────┘
-
- ┌──────────────────────────────────┐
- │  Query del Usuario               │
- └──────┬───────────────────────────┘
-        │
-        ▼
- ┌─────────────────────────────────┐
- │  Lambda: Query Handler          │
- │  1. Busca en Pinecone           │
- │  2. Llama Bedrock (Haiku)       │
- │  3. Retorna respuesta           │
- └─────────────────────────────────┘
+┌──────┴────────────────────────────────────┐
+│  Lambda: Query Handler                    │
+│  ┌────────────────────────────────────┐   │
+│  │ ChromaDB (in-memory)               │   │
+│  │ - Carga desde S3                   │   │
+│  │ - Busca vectores                   │   │
+│  │ - Retorna top-K                    │   │
+│  └────────────────────────────────────┘   │
+│  - Llama Bedrock (Haiku)                  │
+│  - Retorna respuesta                      │
+└───────────────────────────────────────────┘
 ```
 
 ## 📝 Configuración Paso a Paso
 
-### Paso 1: Configurar Pinecone (Gratis)
+### Paso 1: Instalar ChromaDB Localmente (Testing)
 
 ```bash
-# 1. Crear cuenta en Pinecone.io (free tier)
-# 2. Crear API key
-# 3. Guardar en AWS Secrets Manager
+# Instalar para testing local
+pip install chromadb
 
-aws secretsmanager create-secret \
-  --name snail-dev-pinecone-api-key \
-  --secret-string '{"api_key":"tu-api-key"}'
+# Crear layer para Lambda
+mkdir -p lambda-layers/chromadb/python
+pip install chromadb -t lambda-layers/chromadb/python/
+cd lambda-layers/chromadb
+zip -r chromadb-layer.zip python/
+
+# Subir layer a AWS
+aws lambda publish-layer-version \
+  --layer-name chromadb-layer \
+  --zip-file fileb://chromadb-layer.zip \
+  --compatible-runtimes python3.11 \
+  --region us-east-1
 ```
 
 ### Paso 2: Configurar Terraform Variables
@@ -155,77 +166,142 @@ project_name = "snail-poc"
 # Usar Haiku en lugar de Sonnet
 bedrock_model_id = "anthropic.claude-3-haiku-20240307-v1:0"
 
-# Sin OpenSearch - usar Pinecone
+# Sin OpenSearch - usar ChromaDB en Lambda
 use_opensearch = false
-vector_store_type = "pinecone"
+vector_store_type = "chromadb"  # Open source, gratis
 
-# Minimal Lambda configuration
-lambda_memory_mb = 512  # Mínimo necesario
-lambda_timeout_seconds = 30
+# Lambda configuration para ChromaDB
+lambda_memory_mb = 512  # ChromaDB en memoria
+lambda_timeout_seconds = 60  # Tiempo para cargar/guardar S3
+lambda_ephemeral_storage_mb = 1024  # /tmp para ChromaDB data
 
-# S3 con lifecycle agresivo
-s3_lifecycle_days_to_glacier = 7  # Mover a Glacier rápido
+# S3 para backup de ChromaDB
+create_chroma_backup_bucket = true
 
 # Sin Textract
 enable_textract = false
 ```
 
-### Paso 3: Configurar Lambda para Pinecone
+### Paso 3: Configurar Lambda con ChromaDB
 
 ```python
 # modules/aws-bedrock-agents/lambda-functions/pdf-processor/handler.py
 
 import os
 import boto3
-from pinecone import Pinecone
+import chromadb
+from chromadb.config import Settings
 from PyPDF2 import PdfReader
+from io import BytesIO
 import json
+import tarfile
 
-# Inicializar Pinecone
-pc = Pinecone(api_key=os.environ['PINECONE_API_KEY'])
-index = pc.Index("snail-poc")
-
-# Inicializar Bedrock
+# Clientes AWS
+s3 = boto3.client('s3')
 bedrock = boto3.client('bedrock-runtime', region_name='us-east-1')
 
+# Bucket para backup de ChromaDB
+CHROMA_BACKUP_BUCKET = os.environ.get('CHROMA_BACKUP_BUCKET', 'snail-chroma-backup')
+CHROMA_BACKUP_KEY = 'chroma_data.tar.gz'
+
 def lambda_handler(event, context):
-    # 1. Leer PDF desde S3
-    s3 = boto3.client('s3')
+    # 1. Cargar ChromaDB existente desde S3 (si existe)
+    chroma_client = load_chroma_from_s3()
+
+    # 2. Obtener o crear colección
+    collection = chroma_client.get_or_create_collection(
+        name="documents",
+        metadata={"hnsw:space": "cosine"}
+    )
+
+    # 3. Leer PDF desde S3
     bucket = event['Records'][0]['s3']['bucket']['name']
     key = event['Records'][0]['s3']['object']['key']
 
     obj = s3.get_object(Bucket=bucket, Key=key)
-    pdf = PdfReader(obj['Body'])
+    pdf = PdfReader(BytesIO(obj['Body'].read()))
 
-    # 2. Extraer texto (GRATIS - no usar Textract)
+    # 4. Extraer texto (GRATIS - PyPDF2)
     text = ""
     for page in pdf.pages:
         text += page.extract_text()
 
-    # 3. Chunking simple
-    chunks = simple_chunk(text, chunk_size=1000)
+    # 5. Chunking simple
+    chunks = simple_chunk(text, chunk_size=500)
 
-    # 4. Generar embeddings con Titan (barato)
-    vectors = []
+    # 6. Generar embeddings y agregar a ChromaDB
     for i, chunk in enumerate(chunks):
+        # Generar embedding con Bedrock
         response = bedrock.invoke_model(
             modelId='amazon.titan-embed-text-v1',
             body=json.dumps({"inputText": chunk})
         )
         embedding = json.loads(response['body'].read())['embedding']
-        vectors.append({
-            "id": f"{key}_{i}",
-            "values": embedding,
-            "metadata": {"text": chunk, "source": key}
+
+        # Agregar a ChromaDB
+        collection.add(
+            embeddings=[embedding],
+            documents=[chunk],
+            metadatas=[{"source": key, "chunk_id": i}],
+            ids=[f"{key}_{i}"]
+        )
+
+    # 7. Persistir ChromaDB a S3
+    persist_chroma_to_s3(chroma_client)
+
+    return {
+        'statusCode': 200,
+        'body': json.dumps({
+            'message': 'Document processed',
+            'source': key,
+            'chunks': len(chunks)
         })
+    }
 
-    # 5. Indexar en Pinecone (GRATIS)
-    index.upsert(vectors=vectors)
+def load_chroma_from_s3():
+    """Carga ChromaDB desde S3 o crea nuevo"""
+    try:
+        # Descargar backup
+        s3.download_file(
+            CHROMA_BACKUP_BUCKET,
+            CHROMA_BACKUP_KEY,
+            '/tmp/chroma_data.tar.gz'
+        )
 
-    return {'statusCode': 200, 'body': 'Document processed'}
+        # Extraer
+        with tarfile.open('/tmp/chroma_data.tar.gz', 'r:gz') as tar:
+            tar.extractall('/tmp/')
 
-def simple_chunk(text, chunk_size=1000):
-    """Simple chunking - sin dependencias externas"""
+        print("ChromaDB loaded from S3")
+    except Exception as e:
+        print(f"No existing ChromaDB found: {e}")
+
+    # Inicializar cliente
+    return chromadb.Client(Settings(
+        chroma_db_impl="duckdb+parquet",
+        persist_directory="/tmp/chroma"
+    ))
+
+def persist_chroma_to_s3(chroma_client):
+    """Guarda ChromaDB a S3"""
+    # Persistir localmente
+    chroma_client.persist()
+
+    # Comprimir
+    with tarfile.open('/tmp/chroma_data.tar.gz', 'w:gz') as tar:
+        tar.add('/tmp/chroma', arcname='chroma')
+
+    # Subir a S3
+    s3.upload_file(
+        '/tmp/chroma_data.tar.gz',
+        CHROMA_BACKUP_BUCKET,
+        CHROMA_BACKUP_KEY
+    )
+
+    print("ChromaDB persisted to S3")
+
+def simple_chunk(text, chunk_size=500):
+    """Chunking simple sin dependencias externas"""
     words = text.split()
     chunks = []
     current_chunk = []
@@ -253,39 +329,62 @@ def simple_chunk(text, chunk_size=1000):
 
 import os
 import boto3
-from pinecone import Pinecone
+import chromadb
+from chromadb.config import Settings
 import json
+import tarfile
 
-pc = Pinecone(api_key=os.environ['PINECONE_API_KEY'])
-index = pc.Index("snail-poc")
+# Clientes AWS
+s3 = boto3.client('s3')
 bedrock = boto3.client('bedrock-runtime', region_name='us-east-1')
 
-def lambda_handler(event, context):
-    query = event['query']
+CHROMA_BACKUP_BUCKET = os.environ.get('CHROMA_BACKUP_BUCKET', 'snail-chroma-backup')
+CHROMA_BACKUP_KEY = 'chroma_data.tar.gz'
 
-    # 1. Generar embedding de la query
+def lambda_handler(event, context):
+    query = event.get('query')
+
+    if not query:
+        return {
+            'statusCode': 400,
+            'body': json.dumps({'error': 'Query parameter required'})
+        }
+
+    # 1. Cargar ChromaDB desde S3
+    chroma_client = load_chroma_from_s3()
+    collection = chroma_client.get_collection(name="documents")
+
+    # 2. Generar embedding de la query
     response = bedrock.invoke_model(
         modelId='amazon.titan-embed-text-v1',
         body=json.dumps({"inputText": query})
     )
     query_embedding = json.loads(response['body'].read())['embedding']
 
-    # 2. Buscar en Pinecone (GRATIS)
-    results = index.query(
-        vector=query_embedding,
-        top_k=3,
-        include_metadata=True
+    # 3. Buscar en ChromaDB (GRATIS)
+    results = collection.query(
+        query_embeddings=[query_embedding],
+        n_results=5,
+        include=['documents', 'metadatas', 'distances']
     )
 
-    # 3. Construir contexto
-    context = "\n\n".join([match['metadata']['text'] for match in results['matches']])
+    # 4. Construir contexto
+    if not results['documents'][0]:
+        return {
+            'statusCode': 404,
+            'body': json.dumps({'error': 'No documents found in database'})
+        }
 
-    # 4. Llamar a Haiku (BARATO)
-    prompt = f"""Contexto: {context}
+    context = "\n\n".join(results['documents'][0])
 
-Pregunta: {query}
+    # 5. Llamar a Claude Haiku (BARATO)
+    prompt = f"""Contexto de documentos:
 
-Responde basándote en el contexto proporcionado."""
+{context}
+
+Pregunta del usuario: {query}
+
+Por favor, responde la pregunta basándote únicamente en el contexto proporcionado. Si la información no está en el contexto, indícalo claramente."""
 
     response = bedrock.invoke_model(
         modelId='anthropic.claude-3-haiku-20240307-v1:0',
@@ -302,9 +401,29 @@ Responde basándote en el contexto proporcionado."""
         'statusCode': 200,
         'body': json.dumps({
             'answer': answer,
-            'sources': [m['metadata']['source'] for m in results['matches']]
+            'sources': [m['source'] for m in results['metadatas'][0]],
+            'confidence_scores': results['distances'][0]
         })
     }
+
+def load_chroma_from_s3():
+    """Carga ChromaDB desde S3"""
+    # Descargar
+    s3.download_file(
+        CHROMA_BACKUP_BUCKET,
+        CHROMA_BACKUP_KEY,
+        '/tmp/chroma_data.tar.gz'
+    )
+
+    # Extraer
+    with tarfile.open('/tmp/chroma_data.tar.gz', 'r:gz') as tar:
+        tar.extractall('/tmp/')
+
+    # Inicializar cliente
+    return chromadb.Client(Settings(
+        chroma_db_impl="duckdb+parquet",
+        persist_directory="/tmp/chroma"
+    ))
 ```
 
 ## 🚫 Qué NO Hacer en POC
@@ -387,16 +506,18 @@ Cuando el POC valide la solución, migrar a:
 
 ## 📝 Checklist de Setup
 
-- [ ] Crear cuenta Pinecone (free tier)
-- [ ] Configurar API key en AWS Secrets Manager
-- [ ] Modificar terraform.tfvars para usar Haiku
-- [ ] Deshabilitar OpenSearch en configuración
-- [ ] Implementar Lambdas con PyPDF2 (no Textract)
-- [ ] Configurar S3 lifecycle policies agresivas
-- [ ] Crear AWS Budget de $10/mes con alertas
+- [ ] Instalar ChromaDB localmente para testing
+- [ ] Crear Lambda layer con ChromaDB
+- [ ] Crear bucket S3 para backup de ChromaDB
+- [ ] Modificar terraform.tfvars para usar Haiku + ChromaDB
+- [ ] Implementar Lambdas con ChromaDB + PyPDF2
+- [ ] Configurar Lambda con 512MB RAM y 60s timeout
+- [ ] Configurar S3 lifecycle policies para backups
+- [ ] Crear AWS Budget de $5/mes con alertas
 - [ ] Usar Step Functions Express (no Standard)
 - [ ] Documentar limitaciones del POC
-- [ ] Testear con <20 documentos inicialmente
+- [ ] Testear con 5-10 documentos inicialmente
+- [ ] Verificar costos en AWS Cost Explorer después de 1 semana
 
 ## 💡 Tips para Minimizar Costos Aún Más
 
@@ -416,4 +537,12 @@ Para uso en producción o con clientes, consultar `COST_ANALYSIS.md` para config
 
 ---
 
-**Con esta configuración, puedes tener un agente AI funcional por menos de $5-10/mes.** 🎉
+**Con esta configuración, puedes tener un agente AI funcional por menos de $3/mes.** 🎉
+
+## 📚 Recursos Adicionales
+
+- **Opciones Gratuitas Detalladas**: `docs/aws-bedrock-agents/FREE_VECTOR_DB_OPTIONS.md`
+- **Comparativa Vector DBs**: `docs/aws-bedrock-agents/VECTOR_DB_COMPARISON.md`
+- **Análisis Completo de Costos**: `docs/aws-bedrock-agents/COST_ANALYSIS.md`
+- **ChromaDB Docs**: https://docs.trychroma.com/
+- **AWS Bedrock Pricing**: https://aws.amazon.com/bedrock/pricing/
