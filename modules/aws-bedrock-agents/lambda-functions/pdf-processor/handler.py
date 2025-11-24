@@ -244,21 +244,29 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     """
     Handler principal de Lambda
 
-    Evento esperado:
-    {
-        "bucket": "bucket-name",
-        "key": "path/to/document.pdf"
-    }
+    Soporta dos formatos de evento:
+    1. Directo: {"bucket": "bucket-name", "key": "path/to/document.pdf"}
+    2. S3 Event: {"Records": [{"s3": {"bucket": {"name": "..."}, "object": {"key": "..."}}}]}
     """
     try:
         logger.info(f"Evento recibido: {json.dumps(event)}")
 
         # Extraer parámetros del evento
-        bucket = event.get('bucket') or event.get('Bucket')
-        key = event.get('key') or event.get('Key')
+        bucket = None
+        key = None
+
+        # Formato S3 Event
+        if 'Records' in event and len(event['Records']) > 0:
+            s3_record = event['Records'][0]['s3']
+            bucket = s3_record['bucket']['name']
+            key = s3_record['object']['key']
+        # Formato directo
+        else:
+            bucket = event.get('bucket') or event.get('Bucket')
+            key = event.get('key') or event.get('Key')
 
         if not bucket or not key:
-            raise ValueError("Evento debe contener 'bucket' y 'key'")
+            raise ValueError("Evento debe contener 'bucket' y 'key' o ser un evento S3 válido")
 
         # 1. Cargar FAISS index desde S3
         faiss_index, metadata_list = load_faiss_from_s3()

@@ -4,13 +4,13 @@ Módulo completo para crear agentes de AI usando AWS Bedrock que procesan y resp
 
 ## 🎯 Características
 
-- ✅ **Procesamiento automático de PDFs** con EventBridge + Step Functions + Lambda
-- ✅ **Vector database gratuita** con ChromaDB (open source)
+- ✅ **Procesamiento automático de PDFs** con S3 triggers + Lambda
+- ✅ **Vector search con FAISS** (Facebook AI Similarity Search) - rápido y eficiente
 - ✅ **Embeddings con Bedrock Titan** para búsqueda semántica
 - ✅ **RAG con Claude** para respuestas contextuales
 - ✅ **Infraestructura completa con Terraform** (modular y multi-ambiente)
-- ✅ **Scripts de deployment y testing** listos para usar
-- ✅ **Costo optimizado**: <$2/mes para POC
+- ✅ **Lambda Layer optimizado** (38 MB vs 113 MB con ChromaDB)
+- ✅ **Costo optimizado**: ~$0.78/mes para POC, ~$19/mes para producción
 
 ## 📁 Estructura del Módulo
 
@@ -36,7 +36,7 @@ modules/aws-bedrock-agents/
 │   ├── query-handler/                 # RAG queries
 │   │   ├── handler.py
 │   │   └── requirements.txt
-│   └── lambda-layer-chromadb/         # Layer compartido
+│   └── lambda-layer-chromadb/         # Layer compartido (FAISS + PyPDF2)
 │       ├── requirements.txt
 │       └── build-layer.sh
 │
@@ -80,9 +80,10 @@ cd modules/aws-bedrock-agents
 ```
 
 Este script hará:
-1. ✅ Crear Lambda Layer de ChromaDB
+1. ✅ Crear Lambda Layer de FAISS
 2. ✅ Desplegar infraestructura con Terraform
-3. ✅ Mostrar outputs y próximos pasos
+3. ✅ Configurar S3 triggers automáticos
+4. ✅ Mostrar outputs y próximos pasos
 
 ### Deployment Manual (paso por paso)
 
@@ -91,14 +92,14 @@ Este script hará:
 ```bash
 cd lambda-functions/lambda-layer-chromadb
 
-# Construir layer
+# Construir layer (FAISS + PyPDF2 + numpy)
 ./build-layer.sh
 
 # Publicar en AWS
 aws lambda publish-layer-version \
-  --layer-name snail-bedrock-chromadb \
-  --zip-file fileb://chromadb-layer.zip \
-  --compatible-runtimes python3.11 python3.12 \
+  --layer-name snail-bedrock-dev-faiss-layer \
+  --zip-file fileb://faiss-layer.zip \
+  --compatible-runtimes python3.11 \
   --region us-east-1
 ```
 
@@ -154,22 +155,23 @@ terraform output
 │ 1. Extrae texto (PyPDF2)     │
 │ 2. Chunking                  │
 │ 3. Embeddings (Titan)        │
-│ 4. Guarda en ChromaDB        │
-│ 5. Backup a S3               │
+│ 4. Indexa en FAISS           │
+│ 5. Persiste a S3             │
 └──────────────────────────────┘
          │
          ▼
 ┌──────────────────────────────┐
-│ ChromaDB (persistido en S3)  │
-│ - Vector search              │
-│ - Cosine similarity          │
+│ FAISS Index (persistido S3)  │
+│ - faiss_index.bin            │
+│ - faiss_metadata.pkl         │
+│ - L2 distance search         │
 └──────────┬───────────────────┘
            │
            ▼
 ┌──────────────────────────────┐
 │ Lambda: Query Handler        │
-│ 1. Query → embedding         │
-│ 2. Busca en ChromaDB         │
+│ 1. Query → embedding (Titan) │
+│ 2. FAISS similarity search   │
 │ 3. RAG con Claude            │
 │ 4. Respuesta contextual      │
 └──────────────────────────────┘
@@ -216,29 +218,27 @@ curl -X POST $QUERY_URL \
 
 ## 💰 Costos Estimados
 
-### POC/Development (~$1-2/mes)
+### POC/Development (~$0.78/mes)
 
 | Servicio | Configuración | Costo/Mes |
 |----------|---------------|-----------|
 | S3 | <1GB storage | $0.02 |
-| Lambda | Free tier (100 docs/mes) | $0.00 |
-| Step Functions | Express, <1000 ejecuciones | $0.50 |
+| Lambda | Free tier (100 docs/mes) | $0.20 |
 | Bedrock Titan Embeddings | 100 docs × 10 chunks | $0.01 |
 | Bedrock Claude Haiku | 100 queries | $0.50 |
 | CloudWatch Logs | 7 días retención | $0.05 |
-| **TOTAL** | | **~$1.08/mes** ✅ |
+| **TOTAL** | | **~$0.78/mes** ✅ |
 
-### Producción Ligera (~$30-50/mes)
+### Producción Ligera (~$19/mes)
 
 | Servicio | Configuración | Costo/Mes |
 |----------|---------------|-----------|
-| S3 | 10GB storage + requests | $0.50 |
+| S3 | 10GB storage + requests | $0.12 |
 | Lambda | 10,000 ejecuciones | $2.00 |
-| Step Functions | 5,000 ejecuciones | $12.50 |
-| Bedrock Embeddings | 1,000 docs | $0.30 |
+| Bedrock Embeddings | 1,000 docs | $0.10 |
 | Bedrock Claude Sonnet | 1,000 queries | $15.00 |
 | CloudWatch | 30 días retención | $2.00 |
-| **TOTAL** | | **~$32.30/mes** |
+| **TOTAL** | | **~$19.22/mes** |
 
 ## 🔧 Configuración Avanzada
 
@@ -338,7 +338,7 @@ pdf_processor_memory = 2048  # 2GB
 terraform apply
 ```
 
-### ChromaDB no carga en Lambda
+### FAISS Layer no carga en Lambda
 
 ```bash
 # Verificar que el layer existe
@@ -346,18 +346,30 @@ aws lambda list-layers --region us-east-1
 
 # Reconstruir layer
 cd lambda-functions/lambda-layer-chromadb
-rm chromadb-layer.zip
+rm faiss-layer.zip
 ./build-layer.sh
 ```
 
 ### Query handler retorna "No hay documentos"
 
 ```bash
-# Verificar que ChromaDB tiene datos
+# Verificar que FAISS index existe en S3
 aws s3 ls s3://$(terraform output -raw chromadb_backup_bucket)/
+# Debe mostrar: faiss_index.bin y faiss_metadata.pkl
 
 # Verificar logs de pdf-processor
 aws logs tail /aws/lambda/snail-bedrock-dev-pdf-processor --since 1h
+```
+
+### S3 trigger no dispara automáticamente
+
+```bash
+# Verificar configuración de notificaciones S3
+aws s3api get-bucket-notification-configuration \
+  --bucket $(terraform output -raw raw_documents_bucket)
+
+# Verificar permisos de Lambda
+aws lambda get-policy --function-name snail-bedrock-dev-pdf-processor
 ```
 
 ## 🚦 Próximos Pasos
@@ -379,5 +391,18 @@ Para issues o preguntas:
 ---
 
 **Desarrollado por**: Snail Data Solutions
-**Versión**: 1.0.0
-**Última actualización**: 2025-01-24
+**Versión**: 1.1.0 (FAISS migration)
+**Última actualización**: 2025-11-24
+
+## 📝 Changelog
+
+### v1.1.0 (2025-11-24)
+- ✅ Migrado de ChromaDB a FAISS para vector search
+- ✅ Lambda Layer reducido de 113 MB a 38 MB (66% reducción)
+- ✅ S3 triggers directos en lugar de EventBridge + Step Functions
+- ✅ CloudWatch Alarms configuradas para monitoring
+- ✅ Costos reducidos: $0.78/mes (POC), $19/mes (prod)
+- ✅ Testing end-to-end validado (100% accuracy)
+
+### v1.0.0 (2025-01-24)
+- Versión inicial con ChromaDB
