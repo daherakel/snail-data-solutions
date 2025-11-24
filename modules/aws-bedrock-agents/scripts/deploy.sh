@@ -40,24 +40,26 @@ echo -e "${GREEN}✅ Prerrequisitos verificados${NC}"
 echo ""
 
 # Paso 1: Crear Lambda Layer (si no existe)
-echo "📦 Paso 1: Creando Lambda Layer de ChromaDB..."
+echo "📦 Paso 1: Creando Lambda Layer de FAISS..."
 LAYER_DIR="$PROJECT_ROOT/lambda-functions/lambda-layer-chromadb"
 
-if [ ! -f "$LAYER_DIR/chromadb-layer.zip" ]; then
-    echo "   Building ChromaDB layer..."
+if [ ! -f "$LAYER_DIR/faiss-layer.zip" ]; then
+    echo "   Building FAISS layer (faiss-cpu + PyPDF2 + numpy)..."
     cd "$LAYER_DIR"
     ./build-layer.sh
 
     echo "   Publicando layer en AWS..."
-    aws lambda publish-layer-version \
-        --layer-name snail-bedrock-chromadb \
-        --zip-file fileb://chromadb-layer.zip \
-        --compatible-runtimes python3.11 python3.12 \
-        --region us-east-1
+    LAYER_ARN=$(aws lambda publish-layer-version \
+        --layer-name snail-bedrock-$ENVIRONMENT-faiss-layer \
+        --zip-file fileb://faiss-layer.zip \
+        --compatible-runtimes python3.11 \
+        --region us-east-1 \
+        --query 'LayerVersionArn' \
+        --output text)
 
-    echo -e "${GREEN}✅ Lambda Layer creado${NC}"
+    echo -e "${GREEN}✅ Lambda Layer creado: $LAYER_ARN${NC}"
 else
-    echo -e "${YELLOW}⚠️  Lambda Layer ya existe, saltando...${NC}"
+    echo -e "${YELLOW}⚠️  Lambda Layer ya existe (faiss-layer.zip), saltando...${NC}"
 fi
 echo ""
 
@@ -100,13 +102,16 @@ echo ""
 echo -e "${GREEN}🎉 Deployment completado exitosamente!${NC}"
 echo ""
 echo "Próximos pasos:"
-echo "  1. Subir un PDF de prueba:"
+echo "  1. Subir un PDF de prueba (se procesará automáticamente):"
 echo "     aws s3 cp test.pdf s3://\$(terraform output -raw raw_documents_bucket)/"
 echo ""
-echo "  2. Verificar procesamiento:"
-echo "     aws stepfunctions list-executions --state-machine-arn \$(terraform output -raw step_functions_arn)"
+echo "  2. Monitorear procesamiento:"
+echo "     aws logs tail /aws/lambda/snail-bedrock-$ENVIRONMENT-pdf-processor --follow"
 echo ""
 echo "  3. Hacer una query:"
 echo "     curl -X POST \$(terraform output -raw query_handler_url) \\"
 echo "       -H 'Content-Type: application/json' \\"
 echo "       -d '{\"query\": \"¿De qué trata el documento?\"}'"
+echo ""
+echo "  4. Verificar FAISS index en S3:"
+echo "     aws s3 ls s3://\$(terraform output -raw chromadb_backup_bucket)/"

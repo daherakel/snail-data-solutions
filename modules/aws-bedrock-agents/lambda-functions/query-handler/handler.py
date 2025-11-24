@@ -6,6 +6,7 @@ Procesa queries, busca contexto en FAISS y genera respuestas con RAG usando Bedr
 import json
 import os
 import pickle
+import hashlib
 from typing import Dict, List, Any
 
 import boto3
@@ -13,6 +14,9 @@ import numpy as np
 
 # FAISS for vector search (desde Lambda Layer)
 import faiss
+
+# Cache de embeddings en memoria (para queries)
+EMBEDDINGS_CACHE = {}
 
 # Configuración desde variables de entorno
 ENVIRONMENT = os.environ.get('ENVIRONMENT', 'dev')
@@ -80,10 +84,19 @@ def load_faiss_from_s3():
 
 def generate_embedding(text: str) -> np.ndarray:
     """
-    Genera embedding usando Bedrock Titan
+    Genera embedding usando Bedrock Titan con cache
     Returns: numpy array
     """
     try:
+        # Generar hash del texto para cache
+        text_hash = hashlib.md5(text.encode('utf-8')).hexdigest()
+
+        # Verificar cache
+        if text_hash in EMBEDDINGS_CACHE:
+            logger.debug(f"Cache hit para query hash: {text_hash[:8]}...")
+            return EMBEDDINGS_CACHE[text_hash]
+
+        # Generar embedding con Bedrock
         response = bedrock_client.invoke_model(
             modelId=BEDROCK_EMBEDDING_MODEL_ID,
             body=json.dumps({"inputText": text})
@@ -91,6 +104,10 @@ def generate_embedding(text: str) -> np.ndarray:
 
         result = json.loads(response['body'].read())
         embedding = np.array([result['embedding']], dtype=np.float32)
+
+        # Guardar en cache
+        EMBEDDINGS_CACHE[text_hash] = embedding
+        logger.debug(f"Embedding generado y cacheado: {text_hash[:8]}...")
 
         return embedding
 

@@ -6,6 +6,7 @@ Procesa PDFs, extrae texto, genera embeddings con Bedrock y guarda en FAISS inde
 import json
 import os
 import pickle
+import hashlib
 from typing import Dict, List, Any
 
 import boto3
@@ -14,6 +15,9 @@ import numpy as np
 
 # FAISS for vector search (desde Lambda Layer)
 import faiss
+
+# Cache de embeddings en memoria
+EMBEDDINGS_CACHE = {}
 
 # Configuración desde variables de entorno
 ENVIRONMENT = os.environ.get('ENVIRONMENT', 'dev')
@@ -162,10 +166,19 @@ def chunk_text(text: str, chunk_size: int = 1000, overlap: int = 200) -> List[Di
 
 def generate_embedding(text: str) -> np.ndarray:
     """
-    Genera embedding usando Bedrock Titan
+    Genera embedding usando Bedrock Titan con cache
     Returns: numpy array de dimensión EMBEDDING_DIMENSION
     """
     try:
+        # Generar hash del texto para cache
+        text_hash = hashlib.md5(text.encode('utf-8')).hexdigest()
+
+        # Verificar cache
+        if text_hash in EMBEDDINGS_CACHE:
+            logger.debug(f"Cache hit para texto hash: {text_hash[:8]}...")
+            return EMBEDDINGS_CACHE[text_hash]
+
+        # Generar embedding con Bedrock
         response = bedrock_client.invoke_model(
             modelId=BEDROCK_EMBEDDING_MODEL_ID,
             body=json.dumps({"inputText": text})
@@ -173,6 +186,10 @@ def generate_embedding(text: str) -> np.ndarray:
 
         result = json.loads(response['body'].read())
         embedding = np.array(result['embedding'], dtype=np.float32)
+
+        # Guardar en cache
+        EMBEDDINGS_CACHE[text_hash] = embedding
+        logger.debug(f"Embedding generado y cacheado: {text_hash[:8]}...")
 
         return embedding
 
