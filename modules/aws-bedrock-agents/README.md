@@ -1,427 +1,383 @@
-# Infrastructure as Code (IaC)
+# AWS Bedrock AI Agents Module
 
-Infraestructura de AWS definida como código usando Terraform para el proyecto Snail Data Solutions.
+Módulo completo para crear agentes de AI usando AWS Bedrock que procesan y responden consultas sobre documentos PDF usando RAG (Retrieval Augmented Generation).
 
-## Estructura
+## 🎯 Características
+
+- ✅ **Procesamiento automático de PDFs** con EventBridge + Step Functions + Lambda
+- ✅ **Vector database gratuita** con ChromaDB (open source)
+- ✅ **Embeddings con Bedrock Titan** para búsqueda semántica
+- ✅ **RAG con Claude** para respuestas contextuales
+- ✅ **Infraestructura completa con Terraform** (modular y multi-ambiente)
+- ✅ **Scripts de deployment y testing** listos para usar
+- ✅ **Costo optimizado**: <$2/mes para POC
+
+## 📁 Estructura del Módulo
 
 ```
-infrastructure/
-└── terraform/
-    ├── modules/                    # Módulos reutilizables
-    │   ├── bedrock-agent/         # Configuración del agente Bedrock
-    │   ├── bedrock-knowledge-base/ # Knowledge Base con vector store
-    │   ├── lambda/                # Lambda functions
-    │   ├── step-functions/        # Definición de workflows
-    │   ├── s3-storage/           # Buckets S3 por ambiente
-    │   └── iam/                  # Roles y políticas
-    ├── environments/              # Configuración por ambiente
-    │   ├── dev/
-    │   │   ├── main.tf
-    │   │   ├── variables.tf
-    │   │   ├── outputs.tf
-    │   │   └── terraform.tfvars
-    │   ├── staging/
-    │   └── prod/
-    ├── backend.tf                 # Backend de Terraform (S3 + DynamoDB)
-    └── versions.tf                # Versiones de providers
+modules/aws-bedrock-agents/
+├── infrastructure/
+│   └── terraform/
+│       ├── modules/                    # Módulos reusables
+│       │   ├── s3/                    # Buckets para documentos
+│       │   ├── iam/                   # Roles y policies
+│       │   ├── lambda/                # Funciones Lambda
+│       │   ├── step-functions/        # Workflows
+│       │   └── eventbridge/           # Event rules
+│       └── environments/              # Configuraciones por ambiente
+│           ├── dev/                   # Desarrollo
+│           ├── staging/               # Staging
+│           └── prod/                  # Producción
+│
+├── lambda-functions/
+│   ├── pdf-processor/                 # Procesa PDFs → embeddings
+│   │   ├── handler.py
+│   │   └── requirements.txt
+│   ├── query-handler/                 # RAG queries
+│   │   ├── handler.py
+│   │   └── requirements.txt
+│   └── lambda-layer-chromadb/         # Layer compartido
+│       ├── requirements.txt
+│       └── build-layer.sh
+│
+├── scripts/
+│   ├── deploy.sh                      # Deployment completo
+│   ├── upload-document.sh             # Subir y procesar PDF
+│   ├── test-query.sh                  # Testear queries
+│   └── cleanup.sh                     # Limpiar recursos
+│
+└── README.md                          # Este archivo
 ```
 
-## Principios
+## 🚀 Quick Start
 
-### 1. Modularidad
-- Cada módulo es independiente y reutilizable
-- Los módulos reciben parámetros vía variables
-- Outputs bien definidos para composición
+### Prerrequisitos
 
-### 2. Multi-Ambiente
-- Configuración separada por ambiente (dev/staging/prod)
-- Variables específicas en `terraform.tfvars`
-- Backend remoto con workspaces de Terraform
+1. **Terraform** >= 1.0
+   ```bash
+   brew install terraform
+   ```
 
-### 3. Seguridad
-- Principio de privilegios mínimos en IAM
-- Secrets en AWS Secrets Manager (no en código)
-- Encriptación habilitada por defecto
-- Tags obligatorios para auditoría
+2. **AWS CLI** configurado
+   ```bash
+   aws configure
+   aws sts get-caller-identity  # Verificar
+   ```
 
-### 4. Estado Remoto
-- Backend en S3 con versionado
-- Locking con DynamoDB para evitar conflictos
-- Separación de estado por ambiente
+3. **Docker** (para crear Lambda Layer)
+   ```bash
+   docker --version
+   ```
 
-## Prerrequisitos
-
-### 1. Terraform Instalado
-```bash
-# macOS
-brew install terraform
-
-# Verificar instalación
-terraform version
-```
-
-### 2. AWS CLI Configurado
-```bash
-# Ya está configurado en este proyecto
-aws sts get-caller-identity
-```
-
-### 3. Permisos AWS
-Necesitas permisos para crear:
-- S3 buckets
-- Lambda functions
-- IAM roles y políticas
-- Bedrock agents y knowledge bases
-- Step Functions
-- EventBridge rules
-- Textract (para OCR)
-
-## Uso
-
-### Inicializar Terraform (Primera vez)
+### Deployment Automático
 
 ```bash
-# Navegar al ambiente
-cd terraform/environments/dev
+# Desde el directorio del módulo
+cd modules/aws-bedrock-agents
 
-# Inicializar Terraform
+# Ejecutar deployment completo
+./scripts/deploy.sh dev
+```
+
+Este script hará:
+1. ✅ Crear Lambda Layer de ChromaDB
+2. ✅ Desplegar infraestructura con Terraform
+3. ✅ Mostrar outputs y próximos pasos
+
+### Deployment Manual (paso por paso)
+
+#### Paso 1: Crear Lambda Layer
+
+```bash
+cd lambda-functions/lambda-layer-chromadb
+
+# Construir layer
+./build-layer.sh
+
+# Publicar en AWS
+aws lambda publish-layer-version \
+  --layer-name snail-bedrock-chromadb \
+  --zip-file fileb://chromadb-layer.zip \
+  --compatible-runtimes python3.11 python3.12 \
+  --region us-east-1
+```
+
+#### Paso 2: Deploy Terraform
+
+```bash
+cd infrastructure/terraform/environments/dev
+
+# Inicializar
 terraform init
 
-# Ver qué va a crear
+# Ver plan
 terraform plan
+
+# Aplicar
+terraform apply
+```
+
+#### Paso 3: Obtener Outputs
+
+```bash
+terraform output
+
+# Outputs disponibles:
+# - raw_documents_bucket
+# - query_handler_url
+# - step_functions_arn
+```
+
+## 📊 Arquitectura
+
+```
+┌─────────────────┐
+│   PDF Upload    │
+│   (S3 Bucket)   │
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│  EventBridge    │◄─── Detecta .pdf
+│     Rule        │
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│ Step Functions  │
+│   Workflow      │
+└────────┬────────┘
+         │
+         ▼
+┌──────────────────────────────┐
+│ Lambda: PDF Processor        │
+│ 1. Extrae texto (PyPDF2)     │
+│ 2. Chunking                  │
+│ 3. Embeddings (Titan)        │
+│ 4. Guarda en ChromaDB        │
+│ 5. Backup a S3               │
+└──────────────────────────────┘
+         │
+         ▼
+┌──────────────────────────────┐
+│ ChromaDB (persistido en S3)  │
+│ - Vector search              │
+│ - Cosine similarity          │
+└──────────┬───────────────────┘
+           │
+           ▼
+┌──────────────────────────────┐
+│ Lambda: Query Handler        │
+│ 1. Query → embedding         │
+│ 2. Busca en ChromaDB         │
+│ 3. RAG con Claude            │
+│ 4. Respuesta contextual      │
+└──────────────────────────────┘
+```
+
+## 🧪 Testing
+
+### 1. Subir un documento
+
+```bash
+# Usando script
+./scripts/upload-document.sh dev mi-documento.pdf
+
+# O manualmente
+export BUCKET=$(cd infrastructure/terraform/environments/dev && terraform output -raw raw_documents_bucket)
+aws s3 cp test.pdf s3://$BUCKET/
+```
+
+### 2. Monitorear procesamiento
+
+```bash
+export SF_ARN=$(cd infrastructure/terraform/environments/dev && terraform output -raw step_functions_arn)
+
+# Ver ejecuciones
+aws stepfunctions list-executions --state-machine-arn $SF_ARN
+
+# Ver logs
+aws logs tail /aws/lambda/snail-bedrock-dev-pdf-processor --follow
+```
+
+### 3. Hacer queries
+
+```bash
+# Usando script
+./scripts/test-query.sh dev "¿De qué trata el documento?"
+
+# O manualmente con curl
+export QUERY_URL=$(cd infrastructure/terraform/environments/dev && terraform output -raw query_handler_url)
+
+curl -X POST $QUERY_URL \
+  -H "Content-Type: application/json" \
+  -d '{"query": "¿Cuáles son los puntos principales?"}'
+```
+
+## 💰 Costos Estimados
+
+### POC/Development (~$1-2/mes)
+
+| Servicio | Configuración | Costo/Mes |
+|----------|---------------|-----------|
+| S3 | <1GB storage | $0.02 |
+| Lambda | Free tier (100 docs/mes) | $0.00 |
+| Step Functions | Express, <1000 ejecuciones | $0.50 |
+| Bedrock Titan Embeddings | 100 docs × 10 chunks | $0.01 |
+| Bedrock Claude Haiku | 100 queries | $0.50 |
+| CloudWatch Logs | 7 días retención | $0.05 |
+| **TOTAL** | | **~$1.08/mes** ✅ |
+
+### Producción Ligera (~$30-50/mes)
+
+| Servicio | Configuración | Costo/Mes |
+|----------|---------------|-----------|
+| S3 | 10GB storage + requests | $0.50 |
+| Lambda | 10,000 ejecuciones | $2.00 |
+| Step Functions | 5,000 ejecuciones | $12.50 |
+| Bedrock Embeddings | 1,000 docs | $0.30 |
+| Bedrock Claude Sonnet | 1,000 queries | $15.00 |
+| CloudWatch | 30 días retención | $2.00 |
+| **TOTAL** | | **~$32.30/mes** |
+
+## 🔧 Configuración Avanzada
+
+### Variables de Terraform (dev)
+
+Editar `infrastructure/terraform/environments/dev/terraform.tfvars`:
+
+```hcl
+# Proyecto
+project_name = "snail-bedrock"
+environment  = "dev"
+
+# Lambda timeouts
+pdf_processor_timeout = 300  # 5 minutos
+query_handler_timeout = 60   # 1 minuto
+
+# Bedrock models
+bedrock_llm_model_id = "anthropic.claude-3-haiku-20240307-v1:0"  # Haiku (barato)
+# bedrock_llm_model_id = "anthropic.claude-3-sonnet-20240229-v1:0"  # Sonnet (mejor)
+
+# RAG configuration
+max_context_chunks = 5  # Chunks a incluir en contexto
+
+# Logging
+lambda_log_level = "DEBUG"  # DEBUG, INFO, WARNING, ERROR
+
+# Function URL (para testing directo)
+create_function_url = true
+```
+
+### Cambiar a Claude Sonnet (producción)
+
+```hcl
+# En terraform.tfvars
+bedrock_llm_model_id = "anthropic.claude-3-sonnet-20240229-v1:0"
 
 # Aplicar cambios
 terraform apply
 ```
 
-### Workflow de Desarrollo
+## 📚 Documentación Adicional
+
+- **Arquitectura detallada**: `../../docs/aws-bedrock-agents/README.md`
+- **Análisis de costos**: `../../docs/aws-bedrock-agents/COST_ANALYSIS.md`
+- **Setup de POC**: `../../docs/aws-bedrock-agents/POC_SETUP.md`
+- **Comparativa de Vector DBs**: `../../docs/aws-bedrock-agents/VECTOR_DB_COMPARISON.md`
+- **Terraform dev**: `infrastructure/terraform/environments/dev/README.md`
+
+## 🧹 Cleanup
+
+Para eliminar todos los recursos:
 
 ```bash
-# 1. Hacer cambios en módulos o configuración
-vim terraform/modules/lambda/main.tf
+# Usando script (recomendado)
+./scripts/cleanup.sh dev
 
-# 2. Formatear código
-terraform fmt -recursive
+# O manualmente
+cd infrastructure/terraform/environments/dev
 
-# 3. Validar sintaxis
-terraform validate
+# Vaciar buckets primero
+aws s3 rm s3://$(terraform output -raw raw_documents_bucket) --recursive
+aws s3 rm s3://$(terraform output -raw processed_documents_bucket) --recursive
+aws s3 rm s3://$(terraform output -raw chromadb_backup_bucket) --recursive
 
-# 4. Ver plan de cambios
-terraform plan
-
-# 5. Revisar cambios y aplicar
-terraform apply
-
-# 6. Verificar outputs
-terraform output
-```
-
-### Cambiar de Ambiente
-
-```bash
-# Dev
-cd terraform/environments/dev
-terraform plan
-
-# Staging
-cd ../staging
-terraform plan
-
-# Prod
-cd ../prod
-terraform plan
-```
-
-### Destruir Recursos (⚠️ Cuidado)
-
-```bash
-# Solo en dev/staging
+# Destruir infraestructura
 terraform destroy
-
-# NUNCA en prod sin aprobación
 ```
 
-## Variables por Ambiente
+## 🔒 Seguridad
 
-### Dev
-- Modelos más pequeños y económicos
-- Retención corta de logs y datos
-- Sin replicación
-- Sin backups automáticos
+### Implementado
 
-### Staging
-- Configuración idéntica a prod
-- Para testing pre-release
-- Datos de prueba
+- ✅ IAM roles con principio de least privilege
+- ✅ Buckets S3 con encriptación (AES256)
+- ✅ Buckets S3 sin acceso público
+- ✅ VPC para Lambdas (opcional, no implementado por defecto para reducir costos)
+- ✅ CloudWatch logging habilitado
 
-### Prod
-- Modelos optimizados
-- Alta disponibilidad
-- Backups automáticos
-- Retención según compliance
-- Monitoreo y alertas
+### Recomendaciones para Producción
 
-## Convenciones
+1. **Habilitar VPC** para Lambdas
+2. **Usar AWS Secrets Manager** para API keys (si se migra a Pinecone/Qdrant Cloud)
+3. **Habilitar AWS X-Ray** para tracing
+4. **Implementar WAF** si se expone Function URL públicamente
+5. **Configurar alertas** de CloudWatch
+6. **Habilitar backup automático** de S3 con cross-region replication
 
-### Nomenclatura de Recursos
+## 🐛 Troubleshooting
 
-**Formato general**: `{proyecto}-{ambiente}-{servicio}-{proposito}`
-
-Ejemplos:
-- `snail-dev-bedrock-agent`
-- `snail-prod-lambda-pdf-processor`
-- `snail-staging-s3-raw-documents`
-
-### Variables
+### Lambda timeout al procesar PDFs grandes
 
 ```hcl
-# variables.tf
-variable "environment" {
-  description = "Environment name (dev/staging/prod)"
-  type        = string
-  validation {
-    condition     = contains(["dev", "staging", "prod"], var.environment)
-    error_message = "Environment must be dev, staging, or prod."
-  }
-}
+# Aumentar timeout en terraform.tfvars
+pdf_processor_timeout = 600  # 10 minutos
+pdf_processor_memory = 2048  # 2GB
 
-variable "project_name" {
-  description = "Project name for resource naming"
-  type        = string
-  default     = "snail"
-}
+terraform apply
 ```
 
-### Tags Obligatorios
-
-Todos los recursos deben tener:
-```hcl
-tags = {
-  Project     = "snail-data-solutions"
-  Environment = var.environment
-  ManagedBy   = "terraform"
-  Module      = "bedrock-agents"
-  CostCenter  = "data-engineering"
-}
-```
-
-### Outputs
-
-```hcl
-# outputs.tf
-output "bucket_name" {
-  description = "Name of the S3 bucket for raw documents"
-  value       = module.s3_storage.bucket_name
-}
-
-output "lambda_function_arn" {
-  description = "ARN of the PDF processor Lambda function"
-  value       = module.lambda.function_arn
-}
-```
-
-## Módulos Disponibles
-
-### bedrock-agent
-Configura un agente de Bedrock con Knowledge Base y action groups.
-
-**Inputs**:
-- `agent_name`: Nombre del agente
-- `model_id`: ID del modelo (claude-3-sonnet, etc.)
-- `knowledge_base_id`: ID de la knowledge base
-
-**Outputs**:
-- `agent_id`: ID del agente creado
-- `agent_arn`: ARN del agente
-
-### lambda
-Despliega Lambda functions con configuración estandarizada.
-
-**Inputs**:
-- `function_name`: Nombre de la función
-- `handler`: Handler de Python (ej: `handler.lambda_handler`)
-- `runtime`: Runtime de Python (ej: `python3.11`)
-- `source_dir`: Directorio con el código
-
-**Outputs**:
-- `function_name`: Nombre de la función
-- `function_arn`: ARN de la función
-- `invoke_arn`: ARN para invocar
-
-### s3-storage
-Crea buckets S3 con encriptación y lifecycle policies.
-
-**Inputs**:
-- `bucket_name`: Nombre del bucket
-- `versioning_enabled`: Habilitar versionado
-- `lifecycle_rules`: Reglas de lifecycle
-
-**Outputs**:
-- `bucket_name`: Nombre del bucket
-- `bucket_arn`: ARN del bucket
-
-## Estado Remoto (Backend)
-
-### Configuración
-
-```hcl
-# backend.tf
-terraform {
-  backend "s3" {
-    bucket         = "snail-terraform-state"
-    key            = "environments/dev/terraform.tfstate"
-    region         = "us-east-1"
-    encrypt        = true
-    dynamodb_table = "snail-terraform-locks"
-  }
-}
-```
-
-### Setup del Backend (Una sola vez)
+### ChromaDB no carga en Lambda
 
 ```bash
-# 1. Crear bucket para estado
-aws s3 mb s3://snail-terraform-state --region us-east-1
+# Verificar que el layer existe
+aws lambda list-layers --region us-east-1
 
-# 2. Habilitar versionado
-aws s3api put-bucket-versioning \
-  --bucket snail-terraform-state \
-  --versioning-configuration Status=Enabled
-
-# 3. Crear tabla DynamoDB para locks
-aws dynamodb create-table \
-  --table-name snail-terraform-locks \
-  --attribute-definitions AttributeName=LockID,AttributeType=S \
-  --key-schema AttributeName=LockID,KeyType=HASH \
-  --billing-mode PAY_PER_REQUEST \
-  --region us-east-1
+# Reconstruir layer
+cd lambda-functions/lambda-layer-chromadb
+rm chromadb-layer.zip
+./build-layer.sh
 ```
 
-## Seguridad
+### Query handler retorna "No hay documentos"
 
-### Secrets
-
-**NUNCA** colocar secrets en el código Terraform. Usar AWS Secrets Manager:
-
-```hcl
-# Referencia a secret existente
-data "aws_secretsmanager_secret_version" "api_key" {
-  secret_id = "snail/bedrock/api-key"
-}
-
-# Usar en configuración
-resource "aws_lambda_function" "processor" {
-  environment {
-    variables = {
-      API_KEY = data.aws_secretsmanager_secret_version.api_key.secret_string
-    }
-  }
-}
-```
-
-### IAM Roles
-
-Principio de privilegios mínimos:
-
-```hcl
-# Rol específico para Lambda
-resource "aws_iam_role" "lambda_processor" {
-  name = "${var.project_name}-${var.environment}-lambda-processor"
-
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Action = "sts:AssumeRole"
-      Effect = "Allow"
-      Principal = {
-        Service = "lambda.amazonaws.com"
-      }
-    }]
-  })
-}
-
-# Solo permisos necesarios
-resource "aws_iam_role_policy" "lambda_s3_read" {
-  role = aws_iam_role.lambda_processor.id
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Effect = "Allow"
-      Action = ["s3:GetObject"]
-      Resource = "${aws_s3_bucket.raw_docs.arn}/*"
-    }]
-  })
-}
-```
-
-## Best Practices
-
-### 1. Versionado
-- Commitear cambios de Terraform junto con código
-- Usar tags en releases
-- Documentar cambios en commits
-
-### 2. Testing
-- Probar en dev primero
-- Validar en staging
-- Desplegar a prod con aprobación
-
-### 3. Rollback
-- Backend con versionado permite rollback
-- Mantener state files anteriores
-- Tener plan de rollback para prod
-
-### 4. Costos
-- Usar tags para tracking de costos
-- Implementar lifecycle policies en S3
-- Dimensionar recursos apropiadamente por ambiente
-
-### 5. Documentación
-- Documentar módulos con README
-- Comentarios en configuraciones complejas
-- Mantener outputs actualizados
-
-## Troubleshooting
-
-### Error: Backend initialization failed
 ```bash
-# Verificar que el bucket existe
-aws s3 ls s3://snail-terraform-state
+# Verificar que ChromaDB tiene datos
+aws s3 ls s3://$(terraform output -raw chromadb_backup_bucket)/
 
-# Verificar permisos
-aws s3api get-bucket-versioning --bucket snail-terraform-state
+# Verificar logs de pdf-processor
+aws logs tail /aws/lambda/snail-bedrock-dev-pdf-processor --since 1h
 ```
 
-### Error: Lock acquisition failed
-```bash
-# Verificar locks en DynamoDB
-aws dynamodb scan --table-name snail-terraform-locks
+## 🚦 Próximos Pasos
 
-# Forzar unlock (solo si estás seguro)
-terraform force-unlock <lock-id>
-```
+1. **Subir documentos de prueba** y validar procesamiento
+2. **Testear queries** con diferentes tipos de preguntas
+3. **Monitorear costos** en AWS Cost Explorer
+4. **Optimizar chunking** según tipo de documentos
+5. **Agregar soporte** para más formatos (Word, Excel, imágenes)
+6. **Implementar UI web** para interacción con el agente
 
-### Error: Resource already exists
-```bash
-# Importar recurso existente
-terraform import aws_s3_bucket.example my-bucket-name
+## 📞 Soporte
 
-# O eliminar de estado si no lo quieres gestionar
-terraform state rm aws_s3_bucket.example
-```
+Para issues o preguntas:
+- Revisar logs de CloudWatch
+- Verificar IAM permissions
+- Consultar documentación en `docs/aws-bedrock-agents/`
 
-## Próximos Pasos
+---
 
-1. ⏳ Implementar módulos de Terraform
-2. ⏳ Configurar backend remoto
-3. ⏳ Desplegar en ambiente dev
-4. ⏳ Testing y validación
-5. ⏳ Documentar outputs y variables
-6. ⏳ CI/CD para Terraform (GitHub Actions)
-
-## Referencias
-
-- [Terraform AWS Provider](https://registry.terraform.io/providers/hashicorp/aws/latest/docs)
-- [Terraform Best Practices](https://www.terraform-best-practices.com/)
-- [AWS Bedrock Terraform](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/bedrock_agent)
+**Desarrollado por**: Snail Data Solutions
+**Versión**: 1.0.0
+**Última actualización**: 2025-01-24

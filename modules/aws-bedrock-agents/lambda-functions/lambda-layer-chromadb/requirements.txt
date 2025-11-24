@@ -1,0 +1,5 @@
+# Requirements for ChromaDB Lambda Layer
+# Este layer se compila y sube por separado
+
+chromadb==0.4.22
+pydantic==2.5.0
