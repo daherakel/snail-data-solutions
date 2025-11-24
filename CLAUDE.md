@@ -18,10 +18,10 @@ Este repositorio funciona como:
 - **Orquestación**: Apache Airflow 2.10.3 (Astro Runtime 12.5.0)
 - **Transformación**: dbt 1.10.15 con adaptador PostgreSQL
 - **Plataforma**: Astronomer (desarrollo local y deployment)
-- **Cloud**: AWS
+- **Cloud**: AWS (Bedrock, Lambda, Step Functions, S3, Textract)
 - **Base de Datos**: PostgreSQL 13 (para ejemplos locales)
 - **Contenedores**: Docker
-- **IaC**: (Pendiente definir - Terraform recomendado)
+- **IaC**: Terraform (multi-ambiente: dev/staging/prod)
 
 ### Próximamente
 - **Databricks**: Para procesamiento de big data y ML
@@ -93,38 +93,136 @@ El proyecto está diseñado para ser **completamente modular**. Puedes levantar 
 
 ```
 snail-data-solutions/
-├── dags/                           # DAGs de Airflow (módulos independientes)
-│   ├── setup_*                     # DAGs de setup/inicialización
-│   ├── example_*                   # DAGs de ejemplo/referencia
-│   └── dbt_*                       # DAGs que ejecutan dbt
-├── include/                        # Código compartido
-│   ├── dbt/                        # Proyecto dbt (módulo independiente)
-│   ├── sql/                        # SQL queries (reutilizables)
-│   │   ├── seed/                   # Scripts de inicialización
-│   │   ├── etl/                    # Queries ETL
-│   │   └── analytics/              # Queries analíticos
-│   └── config/                     # Configuraciones YAML
-├── plugins/                        # Plugins de Airflow
-├── tests/                          # Tests
-└── infrastructure/                 # IaC (Terraform, etc.) [FUTURO]
+├── modules/                        # Todos los módulos del proyecto
+│   ├── airflow-orchestration/     # Módulo de orquestación con Airflow + dbt
+│   │   ├── dags/                  # DAGs de Airflow
+│   │   │   ├── setup_*            # DAGs de setup/inicialización
+│   │   │   ├── example_*          # DAGs de ejemplo/referencia
+│   │   │   └── dbt_*              # DAGs que ejecutan dbt
+│   │   ├── include/               # Código compartido
+│   │   │   ├── dbt/               # Proyecto dbt
+│   │   │   ├── sql/               # SQL queries
+│   │   │   └── config/            # Configuraciones YAML
+│   │   ├── plugins/               # Plugins de Airflow
+│   │   ├── tests/                 # Tests del módulo
+│   │   ├── Dockerfile             # Imagen de Astronomer
+│   │   ├── requirements.txt       # Dependencias Python
+│   │   ├── Makefile              # Comandos del módulo
+│   │   └── README.md              # Documentación del módulo
+│   │
+│   └── aws-bedrock-agents/        # Módulo de agentes AI con AWS Bedrock
+│       ├── infrastructure/        # IaC con Terraform
+│       │   └── terraform/
+│       │       ├── modules/       # Módulos reutilizables
+│       │       └── environments/  # dev/staging/prod
+│       ├── lambda-functions/      # Código de Lambdas
+│       ├── step-functions/        # Workflows
+│       ├── tests/                 # Tests del módulo
+│       └── README.md              # Documentación del módulo
+│
+├── docs/                           # Documentación general del proyecto
+│   ├── architecture/              # Diagramas y arquitectura
+│   └── aws-bedrock-agents/        # Docs específicos de Bedrock
+│       ├── README.md
+│       ├── ARCHITECTURE.md
+│       └── COST_ANALYSIS.md
+│
+├── .claude/                        # Configuración de Claude Code
+│   └── commands/
+│       └── init.md
+│
+├── CLAUDE.md                       # Este archivo
+├── README.md                       # README principal
+└── .gitignore
 ```
 
 ### Cómo Levantar Componentes Específicos
 
-**Solo Airflow:**
+**Módulo Airflow Orchestration:**
 ```bash
+# Desde el root del proyecto
+cd modules/airflow-orchestration
 astro dev start
-```
 
-**Solo dbt (dentro del contenedor):**
-```bash
+# O usando make
+make start
+
+# Solo dbt (dentro del contenedor)
 make dbt-run
-# o
-astro dev bash -c "cd include/dbt && dbt run"
 ```
 
-**DAG específico:**
+**Módulo AWS Bedrock Agents:**
+```bash
+# Ver análisis de costos primero
+cat docs/aws-bedrock-agents/COST_ANALYSIS.md
+
+# Desplegar infraestructura (ambiente dev)
+cd modules/aws-bedrock-agents/infrastructure/terraform/environments/dev
+terraform init
+terraform plan
+terraform apply
+
+# Ver documentación completa
+cat modules/aws-bedrock-agents/README.md
+```
+
+**DAGs específicos:**
 Los DAGs se pueden activar/desactivar individualmente en la UI de Airflow o mediante tags.
+
+## Módulos del Proyecto
+
+### Módulo AWS Bedrock AI Agents
+
+**Descripción**: Solución modular para crear agentes de AI usando AWS Bedrock que procesan y responden consultas sobre diversos tipos de archivos.
+
+**Componentes**:
+- Amazon Bedrock (Claude/Titan) para modelos de lenguaje
+- Knowledge Bases for Amazon Bedrock (RAG)
+- AWS Lambda para procesamiento de documentos
+- AWS Step Functions para orquestación de workflows
+- Amazon S3 para almacenamiento (raw → processed)
+- Amazon Textract para OCR
+- Terraform para IaC multi-ambiente
+
+**Tipos de archivos soportados**:
+- PDFs y documentos
+- Datos estructurados (CSV, JSON)
+- Código fuente
+- Multimedia (imágenes con texto vía OCR)
+
+**Casos de uso**:
+- Análisis de documentos y contratos
+- Code assistant para bases de código
+- Data analysis sobre datasets
+- Document processing multi-fuente
+
+**Arquitectura**:
+- Pipeline de ingesta: S3 → EventBridge → Step Functions → Lambda → S3 processed → Knowledge Base
+- Agente AI: Bedrock Agent + Knowledge Base + Lambda custom actions
+- Multi-ambiente: dev/staging/prod con Terraform
+
+**Documentación completa**:
+- Módulo: `modules/aws-bedrock-agents/README.md`
+- Arquitectura: `docs/aws-bedrock-agents/README.md`
+- Costos: `docs/aws-bedrock-agents/COST_ANALYSIS.md`
+
+**Costos estimados mensuales** (ver análisis completo en COST_ANALYSIS.md):
+- MVP/Testing: **$10-30** (Claude Haiku + Pinecone free tier)
+- Producción ligera: **$120-200** (Claude Sonnet + Aurora pgvector)
+- Producción moderada: **$350-450** (Sonnet + OpenSearch 2 OCU)
+- Producción intensiva: **$800-1,200** (Sonnet/Opus + OpenSearch escalado)
+
+⚠️ **Nota**: El costo principal es el vector store (OpenSearch ~$175/mes mínimo). Para minimizar costos iniciales, usar alternativas como Aurora pgvector ($50-80/mes) o Pinecone free tier.
+
+**Estado**: 🔄 En desarrollo
+- ✅ Arquitectura diseñada
+- ✅ Estructura de directorios creada
+- ✅ Documentación base
+- ✅ Análisis completo de costos
+- ✅ Estructura modular documentada
+- ⏳ Módulos de Terraform
+- ⏳ Lambda functions
+- ⏳ Step Functions workflows
 
 ## Convenciones del Proyecto
 
@@ -145,6 +243,20 @@ Los DAGs se pueden activar/desactivar individualmente en la UI de Airflow o medi
 
 **Variables de entorno:**
 - Mayúsculas con underscores: `DBT_HOST`, `AIRFLOW_CONN_POSTGRES`
+
+**Módulos de Terraform:**
+- Formato: `{servicio}-{proposito}` (ej: `bedrock-agent`, `lambda-processor`)
+- Variables: snake_case (ej: `knowledge_base_name`, `lambda_timeout`)
+- Outputs: snake_case con sufijo descriptivo (ej: `bucket_arn`, `lambda_function_name`)
+
+**Lambda Functions:**
+- Directorio: `{tipo}-{proposito}` (ej: `pdf-processor`, `query-handler`)
+- Handler: `handler.py` con función `lambda_handler`
+- Archivos: snake_case (ej: `pdf_extractor.py`, `text_processor.py`)
+
+**Step Functions:**
+- Archivos: `{workflow}-{proposito}.asl.json` (ej: `document-ingestion.asl.json`)
+- Estados: PascalCase (ej: `ProcessDocument`, `IndexContent`)
 
 ### Organización de Código
 
@@ -267,7 +379,7 @@ Los DAGs se pueden activar/desactivar individualmente en la UI de Airflow o medi
 - ✅ Integración de dbt con PostgreSQL
 - ✅ Base de datos de ejemplo (e-commerce)
 - ✅ DAGs de ejemplo (ETL, CRUD, branching)
-- ✅ Estructura modular de directorios
+- ✅ Estructura modular con carpeta `modules/`
 - ✅ SQL y configs externalizados
 - ✅ Tests básicos de DAGs
 - ✅ Tests de dbt con validaciones
@@ -275,16 +387,25 @@ Los DAGs se pueden activar/desactivar individualmente en la UI de Airflow o medi
 - ✅ Documentación en README.md
 - ✅ Documentación CLAUDE.md con principios y convenciones
 - ✅ Comando `/init` para cargar contexto automáticamente
+- ✅ AWS CLI configurado y verificado
 
 ### En Progreso
-- (Nada actualmente)
+- 🔄 Módulo AWS Bedrock AI Agents
+  - ✅ Arquitectura diseñada con diagrama de flujo
+  - ✅ Estructura modular documentada (modules/aws-bedrock-agents/)
+  - ✅ Documentación completa del módulo
+  - ✅ Análisis detallado de costos (MVP: $10-30/mes, Prod: $120-1,200/mes)
+  - ✅ Estrategias de optimización de costos identificadas
+  - ✅ Alternativas de vector store evaluadas (OpenSearch vs Aurora vs Pinecone)
+  - ⏳ Módulos de Terraform (bedrock, lambda, step-functions, s3, iam)
+  - ⏳ Lambda functions para procesamiento de documentos
+  - ⏳ Step Functions workflows
 
 ### Por Implementar
 - ⏳ Templates reutilizables para DAGs comunes
 - ⏳ CI/CD pipeline (GitHub Actions)
-- ⏳ Integración con AWS (S3, Redshift, etc.)
+- ⏳ Integración Airflow + AWS (S3, Redshift operators)
 - ⏳ Databricks integration
-- ⏳ IaC con Terraform
 - ⏳ Deployment a Astronomer Cloud
 - ⏳ Monitoreo y alertas
 - ⏳ Catálogo de datos (dbt docs)

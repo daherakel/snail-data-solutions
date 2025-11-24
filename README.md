@@ -1,62 +1,95 @@
 # Snail Data Solutions
 
-Repositorio de soluciones de datos usando Apache Airflow y dbt, gestionado con Astronomer.
+Repositorio de soluciones de Data Engineering y AI, incluyendo pipelines con Apache Airflow y dbt, y agentes de AI con AWS Bedrock.
 
 ## 🛠️ Stack Tecnológico
 
+### Orquestación y Transformación
 - **Airflow**: 2.10.3 (Astro Runtime 12.5.0)
-- **dbt**: 1.10.15 con adaptador PostgreSQL 1.9.1 (instalado automáticamente)
-- **PostgreSQL**: 13
+- **dbt**: 1.10.15 con adaptador PostgreSQL 1.9.1
 - **Astronomer CLI**: Para desarrollo local
-- **Git**: Incluido para operaciones de dbt
+- **PostgreSQL**: 13 (para ejemplos locales)
+
+### Cloud e AI
+- **AWS Bedrock**: Agentes de AI con Claude/Titan
+- **AWS Lambda**: Procesamiento serverless
+- **AWS Step Functions**: Orquestación de workflows
+- **Amazon S3**: Storage de documentos
+- **Amazon Textract**: OCR para imágenes
+
+### Infraestructura
+- **Terraform**: Infrastructure as Code
+- **Docker**: Containerización
+- **Git**: Control de versiones
 
 ## 📁 Estructura del Proyecto
 
 ```
 snail-data-solutions/
-├── dags/                                    # DAGs de Airflow
-│   ├── setup_sample_database.py           # Setup: Carga datos de ejemplo
-│   ├── example_etl_products.py            # Ejemplo: ETL de productos
-│   ├── example_postgres_crud.py           # Ejemplo: CRUD con PostgreSQL
-│   ├── example_conditional_branching.py   # Ejemplo: Branching condicional
-│   └── dbt_run_transformations.py         # dbt: Ejecuta transformaciones
-├── include/                       # Código compartido
-│   ├── dbt/                      # Proyecto dbt
-│   │   ├── models/
-│   │   │   ├── staging/
-│   │   │   └── marts/
-│   │   ├── dbt_project.yml
-│   │   └── profiles.yml
-│   ├── sql/                      # Queries SQL externalizados
-│   │   ├── seed/                 # Scripts de inicialización
-│   │   │   ├── 01_create_schema.sql
-│   │   │   ├── 02_create_tables.sql
-│   │   │   └── 03_insert_sample_data.sql
-│   │   ├── etl/                  # Queries ETL
-│   │   └── analytics/            # Queries de análisis
-│   └── config/                   # Configuraciones YAML
-│       └── dag_config.yaml       # Configuración de DAGs
-├── plugins/                       # Plugins de Airflow
-├── tests/                         # Tests
-│   └── dags/                     # Tests de DAGs
-├── Dockerfile                     # Imagen base de Astronomer
-├── requirements.txt               # Dependencias Python
-├── packages.txt                   # Paquetes del sistema
-├── airflow_settings.yaml          # Configuración local
-└── Makefile                      # Comandos útiles
+├── modules/                                # Todos los módulos del proyecto
+│   ├── airflow-orchestration/            # Orquestación con Airflow + dbt
+│   │   ├── dags/                         # DAGs de Airflow
+│   │   ├── include/                      # Código compartido (dbt, sql, config)
+│   │   ├── plugins/                      # Plugins de Airflow
+│   │   ├── tests/                        # Tests del módulo
+│   │   ├── Dockerfile                    # Imagen de Astronomer
+│   │   ├── requirements.txt              # Dependencias Python
+│   │   ├── Makefile                      # Comandos del módulo
+│   │   └── README.md                     # Documentación
+│   │
+│   └── aws-bedrock-agents/               # Agentes AI con AWS Bedrock
+│       ├── infrastructure/               # IaC con Terraform
+│       ├── lambda-functions/             # Funciones Lambda
+│       ├── step-functions/               # Workflows
+│       ├── tests/                        # Tests del módulo
+│       └── README.md                     # Documentación
+│
+├── docs/                                  # Documentación general
+│   ├── architecture/                     # Diagramas y arquitectura
+│   └── aws-bedrock-agents/               # Docs de Bedrock
+│       ├── README.md                     # Arquitectura detallada
+│       └── COST_ANALYSIS.md              # Análisis de costos
+│
+├── .claude/                               # Configuración Claude Code
+│   └── commands/                         # Comandos personalizados
+│
+├── CLAUDE.md                              # Instrucciones del proyecto
+├── README.md                              # Este archivo
+└── .gitignore
+```
+
+### Módulos Disponibles
+
+#### 1. Airflow Orchestration
+Orquestación de pipelines de datos con Apache Airflow y transformaciones con dbt.
+
+**Ubicación**: `modules/airflow-orchestration/`
+**Documentación**: `modules/airflow-orchestration/README.md`
+
+#### 2. AWS Bedrock AI Agents
+Agentes de AI para procesamiento y consulta de documentos usando AWS Bedrock.
+
+**Ubicación**: `modules/aws-bedrock-agents/`
+**Documentación**:
+- Módulo: `modules/aws-bedrock-agents/README.md`
+- Arquitectura: `docs/aws-bedrock-agents/README.md`
+- Costos: `docs/aws-bedrock-agents/COST_ANALYSIS.md`
 ```
 
 ## 🚀 Quick Start
 
-### Prerrequisitos
+### Módulo Airflow Orchestration
 
+**Prerrequisitos**:
 - Docker Desktop
 - Astronomer CLI: `brew install astro`
 - Make (opcional, para usar atajos)
 
-### Iniciar el proyecto
-
+**Iniciar el módulo**:
 ```bash
+# Navegar al módulo
+cd modules/airflow-orchestration
+
 # Opción 1: Con Makefile
 make start
 
@@ -295,6 +328,53 @@ astro dev bash -c "cd include/dbt && dbt test"
 - `expression_is_true`: Valida reglas de negocio personalizadas
 
 Los tests se definen en `include/dbt/models/*/schema.yml`
+
+## 🤖 Módulo AWS Bedrock AI Agents
+
+### Descripción
+
+Solución modular para crear agentes de AI usando AWS Bedrock que procesan y responden consultas sobre diversos tipos de archivos (PDFs, documentos, CSVs, código, imágenes).
+
+### Arquitectura
+
+- **Document Ingestion Pipeline**: S3 → EventBridge → Step Functions → Lambda → S3 processed → Knowledge Base
+- **AI Agent**: Bedrock Agent + Knowledge Bases (RAG) + Lambda custom actions
+- **Multi-ambiente**: dev/staging/prod con Terraform
+
+### Casos de Uso
+
+- Análisis de documentos y contratos
+- Code assistant para bases de código
+- Data analysis sobre datasets
+- Document processing multi-fuente
+
+### Inicio Rápido
+
+```bash
+# 1. Revisar análisis de costos PRIMERO
+cat docs/aws-bedrock-agents/COST_ANALYSIS.md
+
+# 2. Ver documentación completa
+cat modules/aws-bedrock-agents/README.md
+
+# 3. Desplegar infraestructura (dev)
+cd modules/aws-bedrock-agents/infrastructure/terraform/environments/dev
+terraform init
+terraform plan
+terraform apply
+```
+
+### Estado
+
+🔄 **En desarrollo**
+- ✅ Arquitectura diseñada
+- ✅ Estructura de directorios creada
+- ✅ Documentación base
+- ⏳ Módulos de Terraform
+- ⏳ Lambda functions
+- ⏳ Step Functions workflows
+
+Ver documentación completa: `docs/aws-bedrock-agents/README.md`
 
 ## 📚 Recursos
 
