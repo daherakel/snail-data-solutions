@@ -606,17 +606,27 @@ make start
 - ✅ Comando `/init` para cargar contexto automáticamente
 - ✅ AWS CLI configurado y verificado
 
-### En Progreso
-- 🔄 Módulo AWS Bedrock AI Agents
+### Implementado Recientemente (Nov 2025)
+- ✅ **Módulo AWS Bedrock AI Agents - COMPLETAMENTE DESPLEGADO**
   - ✅ Arquitectura diseñada con diagrama de flujo
   - ✅ Estructura modular documentada (modules/aws-bedrock-agents/)
   - ✅ Documentación completa del módulo
   - ✅ Análisis detallado de costos (MVP: $10-30/mes, Prod: $120-1,200/mes)
   - ✅ Estrategias de optimización de costos identificadas
-  - ✅ Alternativas de vector store evaluadas (OpenSearch vs Aurora vs Pinecone)
-  - ⏳ Módulos de Terraform (bedrock, lambda, step-functions, s3, iam)
-  - ⏳ Lambda functions para procesamiento de documentos
-  - ⏳ Step Functions workflows
+  - ✅ Alternativas de vector store evaluadas (FAISS seleccionado)
+  - ✅ **Infraestructura Terraform desplegada en AWS (ambiente dev)**
+    - S3 buckets (raw, processed, faiss-backup)
+    - DynamoDB tables (query-cache, rate-limiting)
+    - Lambda functions (pdf-processor, query-handler) con FAISS layer
+    - Step Functions state machine para orquestación
+    - EventBridge rules para triggers automáticos
+    - IAM roles con permisos correctos
+  - ✅ **Lambda PDF Processor funcionando** - Procesa PDFs y genera embeddings FAISS
+  - ✅ **Lambda Query Handler funcionando** - Responde consultas con RAG usando Bedrock Claude
+  - ✅ **Cache de queries en DynamoDB** - Optimización de costos funcionando
+  - ✅ **Frontend Next.js desplegado localmente** - UI moderna con chat, upload y analytics
+  - ✅ **Sistema end-to-end probado** - PDF → FAISS → Query → Respuesta con cache
+  - 🔄 Slack Handler (código listo, requiere credenciales de Slack para deploy)
 
 ### Por Implementar
 - ⏳ Templates reutilizables para DAGs comunes
@@ -676,6 +686,6 @@ make clean              # Limpiar todo y empezar fresh
 
 ---
 
-**Última actualización**: 2025-11-24
+**Última actualización**: 2025-11-25
 **Mantenedor**: Snail Data Solutions
-**Versión**: 1.1.0
+**Versión**: 1.2.0 (AWS Bedrock Agents completamente desplegado)
