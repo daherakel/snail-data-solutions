@@ -237,9 +237,17 @@ resource "aws_iam_role_policy" "step_functions" {
         Action = [
           "logs:CreateLogGroup",
           "logs:CreateLogStream",
-          "logs:PutLogEvents"
+          "logs:PutLogEvents",
+          "logs:CreateLogDelivery",
+          "logs:GetLogDelivery",
+          "logs:UpdateLogDelivery",
+          "logs:DeleteLogDelivery",
+          "logs:ListLogDeliveries",
+          "logs:PutResourcePolicy",
+          "logs:DescribeResourcePolicies",
+          "logs:DescribeLogGroups"
         ]
-        Resource = "arn:aws:logs:${var.aws_region}:${var.aws_account_id}:*"
+        Resource = "*"
       }
     ]
   })
