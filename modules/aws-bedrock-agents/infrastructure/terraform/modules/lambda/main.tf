@@ -128,6 +128,9 @@ resource "aws_lambda_function" "query_handler" {
       BEDROCK_LLM_MODEL_ID       = var.bedrock_llm_model_id
       LOG_LEVEL                  = var.log_level
       MAX_CONTEXT_CHUNKS         = var.max_context_chunks
+      CACHE_TABLE_NAME           = var.query_cache_table_name
+      CACHE_TTL_SECONDS          = var.cache_ttl_seconds
+      ENABLE_CACHE               = var.enable_query_cache
     }
   }
 

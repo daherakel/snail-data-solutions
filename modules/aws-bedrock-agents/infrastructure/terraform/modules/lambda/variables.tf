@@ -125,6 +125,26 @@ variable "max_context_chunks" {
 }
 
 # =====================================================
+# DynamoDB Cache Configuration
+# =====================================================
+
+variable "query_cache_table_name" {
+  description = "Nombre de la tabla DynamoDB para cache de queries"
+  type        = string
+}
+
+variable "cache_ttl_seconds" {
+  description = "Tiempo de vida del cache en segundos"
+  type        = number
+}
+
+variable "enable_query_cache" {
+  description = "Habilitar caching de queries"
+  type        = bool
+  default     = true
+}
+
+# =====================================================
 # Logging
 # =====================================================
 

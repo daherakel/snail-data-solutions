@@ -37,6 +37,17 @@ variable "chromadb_backup_bucket_arn" {
   type        = string
 }
 
+variable "query_cache_table_arn" {
+  description = "ARN de la tabla DynamoDB para cache de queries"
+  type        = string
+}
+
+variable "rate_limit_table_arn" {
+  description = "ARN de la tabla DynamoDB para rate limiting"
+  type        = string
+  default     = null
+}
+
 variable "tags" {
   description = "Tags adicionales"
   type        = map(string)

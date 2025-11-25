@@ -51,6 +51,23 @@ module "s3" {
 }
 
 # =====================================================
+# DynamoDB Tables Module
+# =====================================================
+
+module "dynamodb" {
+  source = "../../modules/dynamodb"
+
+  project_name                    = var.project_name
+  environment                     = var.environment
+  billing_mode                    = var.dynamodb_billing_mode
+  enable_rate_limiting            = var.enable_rate_limiting
+  enable_point_in_time_recovery   = var.enable_dynamodb_pitr
+  create_alarms                   = var.create_cloudwatch_alarms
+  cache_ttl_days                  = var.cache_ttl_days
+  tags                            = local.common_tags
+}
+
+# =====================================================
 # IAM Roles Module
 # =====================================================
 
@@ -64,6 +81,8 @@ module "iam" {
   raw_documents_bucket_arn        = module.s3.raw_documents_bucket_arn
   processed_documents_bucket_arn  = module.s3.processed_documents_bucket_arn
   chromadb_backup_bucket_arn      = module.s3.chromadb_backup_bucket_arn
+  query_cache_table_arn           = module.dynamodb.query_cache_table_arn
+  rate_limit_table_arn            = module.dynamodb.rate_limit_table_arn
   tags                            = local.common_tags
 }
 
@@ -100,6 +119,11 @@ module "lambda" {
   # Bedrock Configuration
   bedrock_llm_model_id            = var.bedrock_llm_model_id
   max_context_chunks              = var.max_context_chunks
+
+  # DynamoDB Cache Configuration
+  query_cache_table_name          = module.dynamodb.query_cache_table_name
+  cache_ttl_seconds               = module.dynamodb.cache_ttl_seconds
+  enable_query_cache              = var.enable_query_cache
 
   # Layer
   create_chromadb_layer           = var.create_chromadb_layer

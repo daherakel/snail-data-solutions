@@ -45,6 +45,40 @@ variable "enable_s3_lifecycle" {
 }
 
 # =====================================================
+# DynamoDB Configuration
+# =====================================================
+
+variable "dynamodb_billing_mode" {
+  description = "DynamoDB billing mode (PAY_PER_REQUEST or PROVISIONED)"
+  type        = string
+  default     = "PAY_PER_REQUEST"  # On-demand for variable workloads
+}
+
+variable "enable_rate_limiting" {
+  description = "Habilitar tabla de rate limiting"
+  type        = bool
+  default     = true
+}
+
+variable "enable_dynamodb_pitr" {
+  description = "Habilitar Point-in-Time Recovery para DynamoDB"
+  type        = bool
+  default     = true
+}
+
+variable "cache_ttl_days" {
+  description = "Días para mantener cache de queries"
+  type        = number
+  default     = 7
+}
+
+variable "enable_query_cache" {
+  description = "Habilitar caching de queries en query-handler"
+  type        = bool
+  default     = true
+}
+
+# =====================================================
 # Lambda Configuration
 # =====================================================
 
