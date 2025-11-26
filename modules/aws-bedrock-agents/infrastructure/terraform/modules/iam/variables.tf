@@ -48,6 +48,11 @@ variable "rate_limit_table_arn" {
   default     = null
 }
 
+variable "conversations_table_arn" {
+  description = "ARN de la tabla DynamoDB para conversaciones"
+  type        = string
+}
+
 variable "tags" {
   description = "Tags adicionales"
   type        = map(string)

@@ -9,7 +9,9 @@ import os
 import pickle
 import hashlib
 import re
-from typing import Dict, List, Any, Optional
+import time
+import uuid
+from typing import Dict, List, Any, Optional, Tuple
 
 import boto3
 import numpy as np
@@ -40,6 +42,10 @@ ENABLE_CACHE = os.environ.get('ENABLE_CACHE', 'true').lower() == 'true'
 MAX_CONVERSATION_HISTORY = int(os.environ.get('MAX_CONVERSATION_HISTORY', '10'))  # Últimos 10 mensajes
 MAX_TOKENS_PER_RESPONSE = int(os.environ.get('MAX_TOKENS_PER_RESPONSE', '800'))  # Limitar respuesta
 MAX_QUERY_LENGTH = int(os.environ.get('MAX_QUERY_LENGTH', '500'))  # Caracteres máximos por query
+
+# Conversations configuration
+CONVERSATIONS_TABLE_NAME = os.environ.get('CONVERSATIONS_TABLE_NAME', '')
+MAX_HISTORY_MESSAGES = int(os.environ.get('MAX_HISTORY_MESSAGES', '10'))
 
 # Clientes AWS
 s3_client = boto3.client('s3', region_name=AWS_REGION)
@@ -683,6 +689,182 @@ Responde de forma natural y conversacional basándote SOLO en el contexto."""
     except Exception as e:
         logger.error(f"Error generando respuesta con Bedrock: {e}")
         raise
+
+
+# =====================================================
+# Conversational Sessions Functions
+# =====================================================
+
+def create_conversation(user_id: str = 'anonymous') -> str:
+    """
+    Crea una nueva conversación
+    Returns: conversation_id
+    """
+    conversation_id = f"conv_{uuid.uuid4().hex[:12]}"
+    logger.info(f"Nueva conversación creada: {conversation_id}")
+    return conversation_id
+
+
+def generate_conversation_title(first_user_message: str) -> str:
+    """
+    Genera título de conversación basado en el primer mensaje
+    """
+    # Tomar primeras 50 caracteres o hasta primer signo de puntuación
+    title = first_user_message[:50]
+
+    # Buscar primer punto, pregunta o salto de línea
+    for char in ['.', '?', '!', '\n']:
+        if char in title:
+            title = title[:title.index(char)]
+            break
+
+    return title.strip() or "Nueva conversación"
+
+
+def save_message(
+    conversation_id: str,
+    role: str,
+    content: str,
+    user_id: str = 'anonymous',
+    title: str = None,
+    usage: dict = None,
+    sources: list = None,
+    num_chunks_used: int = 0
+):
+    """
+    Guarda un mensaje en DynamoDB
+    """
+    if not CONVERSATIONS_TABLE_NAME:
+        logger.warning("CONVERSATIONS_TABLE_NAME no configurado - skip save")
+        return
+
+    timestamp = int(time.time() * 1000)
+    message_id = f"{timestamp}#{uuid.uuid4().hex[:8]}"
+
+    item = {
+        'conversation_id': {'S': conversation_id},
+        'message_id': {'S': message_id},
+        'user_id': {'S': user_id},
+        'role': {'S': role},
+        'content': {'S': content},
+        'timestamp': {'N': str(timestamp)},
+        'updated_at': {'N': str(timestamp)}
+    }
+
+    # Título de la conversación
+    if title:
+        item['title'] = {'S': title}
+
+    # Metadata solo para mensajes assistant
+    if role == 'assistant':
+        if usage:
+            item['usage'] = {
+                'M': {
+                    'input_tokens': {'N': str(usage.get('input_tokens', 0))},
+                    'output_tokens': {'N': str(usage.get('output_tokens', 0))},
+                    'total_tokens': {'N': str(usage.get('total_tokens', 0))}
+                }
+            }
+        if sources:
+            item['sources'] = {'L': [{'S': s} for s in sources]}
+        item['num_chunks_used'] = {'N': str(num_chunks_used)}
+
+    try:
+        dynamodb_client.put_item(
+            TableName=CONVERSATIONS_TABLE_NAME,
+            Item=item
+        )
+        logger.info(f"Mensaje guardado: {conversation_id}/{message_id}")
+    except Exception as e:
+        logger.error(f"Error guardando mensaje: {e}")
+        # No raise - queremos que continúe aunque falle el guardado
+
+
+def load_conversation(conversation_id: str, limit: int = None) -> List[Dict[str, Any]]:
+    """
+    Carga historial de una conversación
+    Returns: Lista de mensajes [{role, content, timestamp}, ...]
+    """
+    if not CONVERSATIONS_TABLE_NAME:
+        logger.warning("CONVERSATIONS_TABLE_NAME no configurado - no history")
+        return []
+
+    if limit is None:
+        limit = MAX_HISTORY_MESSAGES
+
+    try:
+        response = dynamodb_client.query(
+            TableName=CONVERSATIONS_TABLE_NAME,
+            KeyConditionExpression='conversation_id = :conv_id',
+            ExpressionAttributeValues={
+                ':conv_id': {'S': conversation_id}
+            },
+            ScanIndexForward=False,  # Orden descendente (más recientes primero)
+            Limit=limit * 2  # *2 porque cada intercambio son 2 mensajes
+        )
+
+        items = response.get('Items', [])
+
+        # Parsear mensajes
+        messages = []
+        for item in reversed(items):  # Revertir para orden cronológico
+            messages.append({
+                'role': item.get('role', {}).get('S', ''),
+                'content': item.get('content', {}).get('S', ''),
+                'timestamp': int(item.get('timestamp', {}).get('N', '0'))
+            })
+
+        logger.info(f"Cargados {len(messages)} mensajes de conversación {conversation_id}")
+        return messages
+
+    except Exception as e:
+        logger.error(f"Error cargando conversación: {e}")
+        return []
+
+
+def list_conversations(user_id: str = 'anonymous', limit: int = 50) -> List[Dict[str, Any]]:
+    """
+    Lista conversaciones del usuario
+    Returns: Lista de conversaciones con título y última actualización
+    """
+    if not CONVERSATIONS_TABLE_NAME:
+        logger.warning("CONVERSATIONS_TABLE_NAME no configurado")
+        return []
+
+    try:
+        response = dynamodb_client.query(
+            TableName=CONVERSATIONS_TABLE_NAME,
+            IndexName='UserConversationsIndex',
+            KeyConditionExpression='user_id = :uid',
+            ExpressionAttributeValues={
+                ':uid': {'S': user_id}
+            },
+            ScanIndexForward=False,  # Más recientes primero
+            Limit=limit
+        )
+
+        # Agrupar por conversation_id y tomar el mensaje más reciente de cada una
+        conversations = {}
+        for item in response.get('Items', []):
+            conv_id = item.get('conversation_id', {}).get('S', '')
+            if conv_id not in conversations:
+                conversations[conv_id] = {
+                    'conversation_id': conv_id,
+                    'title': item.get('title', {}).get('S', 'Sin título'),
+                    'updated_at': int(item.get('updated_at', {}).get('N', '0')),
+                    'preview': item.get('content', {}).get('S', '')[:100]
+                }
+
+        # Convertir a lista y ordenar por updated_at
+        conv_list = list(conversations.values())
+        conv_list.sort(key=lambda x: x['updated_at'], reverse=True)
+
+        logger.info(f"Listadas {len(conv_list)} conversaciones para usuario {user_id}")
+        return conv_list
+
+    except Exception as e:
+        logger.error(f"Error listando conversaciones: {e}")
+        return []
 
 
 def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:

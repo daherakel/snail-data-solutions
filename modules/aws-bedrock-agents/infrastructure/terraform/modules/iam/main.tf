@@ -170,7 +170,9 @@ resource "aws_iam_role_policy" "lambda_query_handler" {
         ]
         Resource = [
           var.query_cache_table_arn,
-          var.rate_limit_table_arn != null ? var.rate_limit_table_arn : "arn:aws:dynamodb:${var.aws_region}:${var.aws_account_id}:table/dummy"
+          var.rate_limit_table_arn != null ? var.rate_limit_table_arn : "arn:aws:dynamodb:${var.aws_region}:${var.aws_account_id}:table/dummy",
+          var.conversations_table_arn,
+          "${var.conversations_table_arn}/index/*"  # GSI permissions
         ]
       },
       {

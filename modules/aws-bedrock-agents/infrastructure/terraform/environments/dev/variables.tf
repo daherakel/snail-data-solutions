@@ -146,6 +146,12 @@ variable "max_context_chunks" {
   default     = 5
 }
 
+variable "max_history_messages" {
+  description = "Número máximo de mensajes de historial conversacional a enviar"
+  type        = number
+  default     = 10
+}
+
 # =====================================================
 # Logging Configuration
 # =====================================================

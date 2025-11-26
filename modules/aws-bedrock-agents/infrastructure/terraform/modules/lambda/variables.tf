@@ -144,6 +144,17 @@ variable "enable_query_cache" {
   default     = true
 }
 
+variable "conversations_table_name" {
+  description = "Nombre de la tabla DynamoDB para conversaciones"
+  type        = string
+}
+
+variable "max_history_messages" {
+  description = "Número máximo de mensajes de historial conversacional"
+  type        = number
+  default     = 10
+}
+
 # =====================================================
 # Logging
 # =====================================================

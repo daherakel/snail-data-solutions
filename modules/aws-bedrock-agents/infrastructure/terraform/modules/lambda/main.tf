@@ -131,6 +131,8 @@ resource "aws_lambda_function" "query_handler" {
       CACHE_TABLE_NAME           = var.query_cache_table_name
       CACHE_TTL_SECONDS          = var.cache_ttl_seconds
       ENABLE_CACHE               = var.enable_query_cache
+      CONVERSATIONS_TABLE_NAME   = var.conversations_table_name
+      MAX_HISTORY_MESSAGES       = var.max_history_messages
     }
   }
 

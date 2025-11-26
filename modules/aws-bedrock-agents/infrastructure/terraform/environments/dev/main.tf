@@ -68,6 +68,18 @@ module "dynamodb" {
 }
 
 # =====================================================
+# Conversations Module (Conversational Sessions)
+# =====================================================
+
+module "conversations" {
+  source = "../../modules/conversations"
+
+  project_name = var.project_name
+  environment  = var.environment
+  tags         = local.common_tags
+}
+
+# =====================================================
 # IAM Roles Module
 # =====================================================
 
@@ -83,6 +95,7 @@ module "iam" {
   chromadb_backup_bucket_arn      = module.s3.chromadb_backup_bucket_arn
   query_cache_table_arn           = module.dynamodb.query_cache_table_arn
   rate_limit_table_arn            = module.dynamodb.rate_limit_table_arn
+  conversations_table_arn         = module.conversations.table_arn
   tags                            = local.common_tags
 }
 
@@ -124,6 +137,10 @@ module "lambda" {
   query_cache_table_name          = module.dynamodb.query_cache_table_name
   cache_ttl_seconds               = module.dynamodb.cache_ttl_seconds
   enable_query_cache              = var.enable_query_cache
+
+  # DynamoDB Conversations Configuration
+  conversations_table_name        = module.conversations.table_name
+  max_history_messages            = var.max_history_messages
 
   # Layer
   create_chromadb_layer           = var.create_chromadb_layer
