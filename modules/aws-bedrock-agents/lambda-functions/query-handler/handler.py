@@ -87,6 +87,97 @@ def detect_user_intent(text: str) -> str:
     return 'question'
 
 
+def get_available_documents(metadata_list: List[Dict[str, Any]]) -> List[str]:
+    """
+    Obtiene lista única de documentos disponibles desde metadata
+    """
+    documents = set()
+    for item in metadata_list:
+        if 'source' in item:
+            documents.add(item['source'])
+    return sorted(list(documents))
+
+
+def is_document_list_request(text: str) -> bool:
+    """
+    Detecta si el usuario está pidiendo ver la lista de documentos
+    """
+    text_lower = text.lower().strip()
+
+    patterns = [
+        # Preguntas directas sobre documentos
+        r'(qué|que|cuáles|cuales)\s+(documentos|archivos|pdfs?)\s+(tienes|tenes|hay|están|estan|disponibles)',
+        r'(documentos|archivos|pdfs?)\s+(tienes|tenes|hay|disponibles)',
+
+        # Solicitudes de listar
+        r'(lista|listar|mostrar|enumerar)\s+.*?(documentos|archivos|pdfs?)',
+        r'(quiero|queres|podes|puedes)\s+que\s+.*?(liste|listes|muestre|muestres)\s+.*?(documentos|archivos|titulos?)',
+
+        # Mencionar o dar títulos
+        r'(podes|puedes|podés)\s+.*?(mencionarme|decirme|darme|mostrarme)\s+.*?(titulos?|documentos|archivos)',
+        r'(mencionar|decir|dar|mostrar)\s+.*?(titulos?|documentos)',
+
+        # Preguntas sobre disponibilidad
+        r'(documentos|archivos|pdfs?)\s+disponibles',
+        r'^(lista|muestra|dame)\s+(documentos|archivos)',
+        r'(cuántos|cuantos)\s+(documentos|archivos)',
+
+        # Títulos de documentos
+        r'títulos?\s+de\s+(documentos|archivos)',
+        r'títulos?\s+(de\s+los\s+)?(documentos|archivos)',
+    ]
+
+    for pattern in patterns:
+        if re.search(pattern, text_lower):
+            return True
+    return False
+
+def clean_formal_phrases(text: str) -> str:
+    """
+    Elimina frases formales/académicas de las respuestas
+    """
+    # Lista de frases a eliminar (con variaciones)
+    formal_phrases = [
+        # Frases con palabras de relleno + según/de acuerdo
+        r'^(Veamos|Bueno|Bien|Ok|Okay)[,\s]+según (los documentos|la información|el contexto)[,\s]+',
+        r'^(Veamos|Bueno|Bien|Ok|Okay)[,\s]+de acuerdo con (los documentos|la información)[,\s]+',
+
+        # Frases al inicio de párrafos
+        r'^Según la información (que tengo|proporcionada|disponible|del contexto|de los documentos)[,\s]+',
+        r'^Según los (documentos|datos|archivos)[,\s]+',
+        r'^De acuerdo con (la información|los documentos|el contexto|los datos)[,\s]+',
+        r'^En los documentos se menciona (que)?[,\s]+',
+        r'^La información proporcionada indica (que)?[,\s]+',
+        r'^Basándome en (la información|los documentos|el contexto)[,\s]+',
+        r'^Con base en (la información|los documentos)[,\s]+',
+
+        # Frases en medio de texto
+        r',?\s*según (la información proporcionada|los documentos|el contexto),?\s*',
+        r',?\s*de acuerdo con (los documentos|la información),?\s*',
+        r',?\s*como se menciona en los documentos,?\s*',
+
+        # Palabras formales innecesarias
+        r'^Lamentablemente,?\s+',
+        r'^Desafortunadamente,?\s+',
+        r'^Desgraciadamente,?\s+',
+    ]
+
+    cleaned_text = text
+    for pattern in formal_phrases:
+        cleaned_text = re.sub(pattern, '', cleaned_text, flags=re.IGNORECASE | re.MULTILINE)
+
+    # Limpiar espacios múltiples y saltos de línea al inicio
+    cleaned_text = re.sub(r'^\s+', '', cleaned_text)
+    cleaned_text = re.sub(r'\s{2,}', ' ', cleaned_text)
+
+    # Capitalizar la primera letra
+    cleaned_text = cleaned_text.strip()
+    if cleaned_text:
+        cleaned_text = cleaned_text[0].upper() + cleaned_text[1:]
+
+    return cleaned_text
+
+
 def is_casual_conversation(text: str) -> tuple[bool, Optional[str]]:
     """
     Detecta si es conversación casual (saludo, despedida, etc.)
@@ -102,16 +193,15 @@ def is_casual_conversation(text: str) -> tuple[bool, Optional[str]]:
 
     for pattern in greetings:
         if re.search(pattern, text_lower):
-            response = """¡Hola! 👋 Soy el asistente de IA de Snail Data Solutions.
+            response = """¡Hola! 👋
 
-Estoy aquí para ayudarte a encontrar información en tus documentos. Puedes preguntarme sobre:
-• Contenido específico de los documentos
-• Tecnologías mencionadas
-• Costos y presupuestos
-• Características del sistema
-• Y cualquier otra información que esté en los documentos
+Soy tu asistente de documentos. Puedo ayudarte a:
+• Buscar información en los documentos
+• Responder preguntas sobre el contenido
+• Listar los documentos disponibles
+• Y mucho más
 
-¿En qué puedo ayudarte hoy?"""
+¿Qué necesitas?"""
             return True, response
 
     # Patrones de despedida
@@ -472,20 +562,39 @@ def generate_rag_response(
     }
 
     # System prompt conversacional y amigable
-    system_prompt = """Eres un asistente personal que ayuda a encontrar información en documentos. Sé conversacional y directo.
+    system_prompt = """Eres un asistente conversacional directo. NO eres formal ni académico.
 
-ESTILO:
-• Habla natural - como un colega útil, no como un robot
-• Directo al punto - sin frases formales innecesarias
-• Conciso - respuestas claras en 2-3 párrafos max
-• Honesto - si no sabes, dilo sin rodeos
+TONO: Habla como un amigo que conoce los documentos. Casual, útil, breve.
+
+ABSOLUTAMENTE PROHIBIDO usar estas frases:
+❌ "Según la información proporcionada"
+❌ "En los documentos se menciona"
+❌ "De acuerdo con el contexto"
+❌ "Lamentablemente"
+❌ "Desafortunadamente"
+❌ "Te sugiero"
+
+EJEMPLOS de cómo DEBES responder:
+
+Usuario: "¿Qué tecnologías usa?"
+✅ BIEN: "Usa AWS Lambda, FAISS para embeddings, y Step Functions para orquestar el workflow."
+❌ MAL: "Según la información proporcionada, el sistema utiliza AWS Lambda, FAISS y Step Functions."
+
+Usuario: "¿Cuánto cuesta?"
+✅ BIEN: "Los costos principales son Lambda (~$5/mes), OpenSearch (~$175/mes) y Bedrock por tokens usados."
+❌ MAL: "De acuerdo con los documentos, los costos estimados incluyen..."
+
+Usuario: "¿Cómo funciona X?"
+Si NO está en los docs:
+✅ BIEN: "No tengo esa info en los documentos."
+❌ MAL: "Lamentablemente, la información proporcionada no incluye detalles sobre X."
 
 REGLAS:
-• USA SOLO información del contexto proporcionado
-• Si no está en los documentos: "No encontré esa información aquí"
-• Evita frases como "Según la información proporcionada" o "En los documentos se menciona"
-• NO sugieras preguntas relacionadas al final
-• Sé útil y amigable"""
+• Responde SOLO lo que está en el contexto
+• Máximo 3 párrafos cortos
+• Si no sabes algo, di "No tengo esa info" y punto
+• Sin formalidades, sin rodeos
+• Directo al grano"""
 
     # Construir el prompt completo
     user_prompt = f"""{history_context}
@@ -530,6 +639,9 @@ Responde de forma natural y conversacional basándote SOLO en el contexto."""
 
         result = json.loads(response['body'].read())
         answer = result['content'][0]['text']
+
+        # Limpiar frases formales
+        answer = clean_formal_phrases(answer)
 
         # Calcular uso de tokens
         input_tokens = result.get('usage', {}).get('input_tokens', 0)
@@ -645,11 +757,44 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 }, ensure_ascii=False)
             }
 
-        # 1. Detectar intención del usuario
+        # 1. Detectar si piden listar documentos
+        if is_document_list_request(query):
+            logger.info("Detectada solicitud de listar documentos")
+            # Cargar FAISS solo para obtener metadata
+            faiss_index, metadata_list = load_faiss_from_s3()
+            documents = get_available_documents(metadata_list)
+
+            if documents:
+                doc_list = "\n".join([f"• {doc}" for doc in documents])
+                response_text = f"Tengo {len(documents)} documento{'s' if len(documents) > 1 else ''} disponible{'s' if len(documents) > 1 else ''}:\n\n{doc_list}\n\n¿Sobre cuál quieres saber más?"
+            else:
+                response_text = "No tengo documentos indexados todavía. Sube algunos PDFs para empezar."
+
+            return {
+                'statusCode': 200,
+                'headers': {
+                    'Content-Type': 'application/json',
+                    'Access-Control-Allow-Origin': '*'
+                },
+                'body': json.dumps({
+                    'query': query,
+                    'answer': response_text,
+                    'sources': documents,
+                    'num_chunks_used': 0,
+                    'usage': {
+                        'input_tokens': 0,
+                        'output_tokens': 0,
+                        'total_tokens': 0
+                    },
+                    'is_document_list': True
+                }, ensure_ascii=False)
+            }
+
+        # 2. Detectar intención del usuario
         user_intent = detect_user_intent(query)
         logger.info(f"Intent detectado: {user_intent}")
 
-        # 2. Revisar cache de DynamoDB
+        # 3. Revisar cache de DynamoDB
         cached_response = get_from_cache(query)
         if cached_response:
             # Cache HIT - retornar respuesta inmediatamente
@@ -676,10 +821,10 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 }, ensure_ascii=False)
             }
 
-        # 3. Cargar FAISS index desde S3
+        # 4. Cargar FAISS index desde S3
         faiss_index, metadata_list = load_faiss_from_s3()
 
-        # 3. Buscar chunks relevantes
+        # 5. Buscar chunks relevantes
         context_chunks = search_similar_chunks(
             faiss_index,
             metadata_list,
