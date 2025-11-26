@@ -331,8 +331,8 @@ export default function Chat() {
               )}
               <p className="whitespace-pre-wrap leading-relaxed">{message.content}</p>
 
-              {/* Extractos relevantes */}
-              {message.role === 'assistant' && message.excerpts && message.excerpts.length > 0 && (
+              {/* Extractos relevantes - OCULTO por preferencia del usuario */}
+              {/* {message.role === 'assistant' && message.excerpts && message.excerpts.length > 0 && (
                 <div className="mt-4 pt-4 border-t border-gray-300 dark:border-gray-600">
                   <p className="font-semibold text-sm mb-2 flex items-center">
                     <span className="mr-2">📄</span>
@@ -352,7 +352,7 @@ export default function Chat() {
                     ))}
                   </div>
                 </div>
-              )}
+              )} */}
 
               {/* Mostrar uso de tokens para respuestas del asistente */}
               {message.role === 'assistant' && message.usage && (
