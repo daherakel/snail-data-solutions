@@ -883,19 +883,92 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     try:
         logger.info(f"Evento recibido: {json.dumps(event, ensure_ascii=False)[:500]}...")
 
-        # Parsear query desde evento
+        # Parsear body desde evento
         if 'body' in event:
             # Request desde Function URL (HTTP)
             body = json.loads(event['body']) if isinstance(event['body'], str) else event['body']
-            query = body.get('query')
-            conversation_history = body.get('conversation_history', [])
         else:
             # Invocación directa
-            query = event.get('query')
-            conversation_history = event.get('conversation_history', [])
+            body = event
 
+        # Detectar acción (para gestión de sesiones)
+        action = body.get('action', 'query')
+
+        # ===== ACTIONS DE GESTIÓN DE SESIONES =====
+        if action == 'list_conversations':
+            user_id = body.get('user_id', 'anonymous')
+            conversations = list_conversations(user_id)
+            return {
+                'statusCode': 200,
+                'headers': {
+                    'Content-Type': 'application/json',
+                    'Access-Control-Allow-Origin': '*'
+                },
+                'body': json.dumps({
+                    'conversations': conversations
+                }, ensure_ascii=False)
+            }
+
+        if action == 'create_conversation':
+            user_id = body.get('user_id', 'anonymous')
+            new_conv_id = create_conversation(user_id)
+            return {
+                'statusCode': 200,
+                'headers': {
+                    'Content-Type': 'application/json',
+                    'Access-Control-Allow-Origin': '*'
+                },
+                'body': json.dumps({
+                    'conversation_id': new_conv_id
+                }, ensure_ascii=False)
+            }
+
+        if action == 'load_conversation':
+            conversation_id = body.get('conversation_id')
+            if not conversation_id:
+                raise ValueError("conversation_id es requerido para load_conversation")
+
+            messages = load_conversation(conversation_id)
+            return {
+                'statusCode': 200,
+                'headers': {
+                    'Content-Type': 'application/json',
+                    'Access-Control-Allow-Origin': '*'
+                },
+                'body': json.dumps({
+                    'messages': messages
+                }, ensure_ascii=False)
+            }
+
+        # ===== QUERY NORMAL CON SESIONES =====
+        query = body.get('query')
         if not query:
             raise ValueError("Evento debe contener 'query'")
+
+        # Obtener o crear conversation_id
+        conversation_id = body.get('conversation_id')
+        is_new_conversation = False
+        if not conversation_id:
+            conversation_id = create_conversation()
+            is_new_conversation = True
+            logger.info(f"Nueva conversación creada: {conversation_id}")
+
+        # Cargar historial de la conversación desde DynamoDB
+        conversation_history = load_conversation(conversation_id)
+        logger.info(f"Historial cargado: {len(conversation_history)} mensajes")
+
+        # Generar título si es nueva conversación
+        conversation_title = None
+        if is_new_conversation:
+            conversation_title = generate_conversation_title(query)
+
+        # Guardar mensaje del usuario
+        save_message(
+            conversation_id=conversation_id,
+            role='user',
+            content=query,
+            title=conversation_title
+        )
 
         # Aplicar guardrails
         is_safe, rejection_message = apply_guardrails(query)
@@ -1033,6 +1106,17 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         # 4. Generar respuesta con RAG, conversación e intent
         rag_result = generate_rag_response(query, context_chunks, conversation_history, user_intent)
 
+        # Guardar respuesta del asistente en DynamoDB
+        save_message(
+            conversation_id=conversation_id,
+            role='assistant',
+            content=rag_result['answer'],
+            title=conversation_title,
+            usage=rag_result['usage'],
+            sources=rag_result['sources'],
+            num_chunks_used=rag_result['num_chunks_used']
+        )
+
         # Resultado exitoso con mejoras
         result = {
             'statusCode': 200,
@@ -1041,6 +1125,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 'Access-Control-Allow-Origin': '*'
             },
             'body': json.dumps({
+                'conversation_id': conversation_id,
                 'query': query,
                 'answer': rag_result['answer'],
                 'sources': rag_result['sources'],

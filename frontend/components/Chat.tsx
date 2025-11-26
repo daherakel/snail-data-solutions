@@ -23,6 +23,13 @@ interface Message {
   };
 }
 
+interface Conversation {
+  conversation_id: string;
+  title: string;
+  updated_at: number;
+  message_count: number;
+}
+
 // Límites
 const MAX_MESSAGES_DISPLAY = 50; // Máximo de mensajes en pantalla
 const MAX_CONVERSATION_HISTORY = 10; // Máximo a enviar al backend
@@ -32,6 +39,9 @@ export default function Chat() {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [totalTokensUsed, setTotalTokensUsed] = useState(0);
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Cargar tokens del localStorage al iniciar
@@ -47,6 +57,11 @@ export default function Chat() {
     localStorage.setItem('snail_total_tokens', totalTokensUsed.toString());
   }, [totalTokensUsed]);
 
+  // Cargar conversaciones al montar el componente
+  useEffect(() => {
+    loadConversations();
+  }, []);
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
@@ -54,6 +69,97 @@ export default function Chat() {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  // Cargar lista de conversaciones desde el backend
+  const loadConversations = async () => {
+    try {
+      const response = await fetch('/api/query', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'list_conversations',
+          user_id: 'anonymous'
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setConversations(data.conversations || []);
+      }
+    } catch (error) {
+      console.error('Error loading conversations:', error);
+    }
+  };
+
+  // Crear nueva conversación
+  const createNewConversation = async () => {
+    try {
+      const response = await fetch('/api/query', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'create_conversation',
+          user_id: 'anonymous'
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setCurrentConversationId(data.conversation_id);
+        setMessages([]);
+        setTotalTokensUsed(0);
+        await loadConversations();
+      }
+    } catch (error) {
+      console.error('Error creating conversation:', error);
+    }
+  };
+
+  // Cambiar a una conversación existente
+  const switchConversation = async (conversationId: string) => {
+    if (conversationId === currentConversationId) return;
+
+    setCurrentConversationId(conversationId);
+    setMessages([]);
+    setIsLoading(true);
+
+    try {
+      // Cargar historial de la conversación
+      const response = await fetch('/api/query', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'load_conversation',
+          conversation_id: conversationId
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const loadedMessages: Message[] = (data.messages || []).map((msg: any) => ({
+          role: msg.role,
+          content: msg.content,
+          sources: msg.sources || [],
+          excerpts: msg.excerpts || [],
+          follow_up_questions: msg.follow_up_questions || [],
+          user_intent: msg.user_intent,
+          timestamp: new Date(msg.timestamp),
+          usage: msg.usage
+        }));
+        setMessages(loadedMessages);
+
+        // Calcular tokens totales de esta conversación
+        const totalTokens = loadedMessages.reduce((sum, msg) => {
+          return sum + (msg.usage?.total_tokens || 0);
+        }, 0);
+        setTotalTokensUsed(totalTokens);
+      }
+    } catch (error) {
+      console.error('Error loading conversation:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   // Calcular mensajes en contexto
   const contextMessagesCount = Math.min(messages.length, MAX_CONVERSATION_HISTORY);
@@ -80,23 +186,24 @@ export default function Chat() {
     const startTime = Date.now();
 
     try {
-      // Preparar historial conversacional (últimos 10 mensajes, excluyendo el actual)
-      const conversationHistory = messages
-        .slice(-MAX_CONVERSATION_HISTORY)
-        .map(msg => ({
-          role: msg.role,
-          content: msg.content
-        }));
+      // Preparar el request body con conversation_id
+      const requestBody: any = {
+        action: 'query',
+        query: queryText,
+        user_id: 'anonymous'
+      };
+
+      // Incluir conversation_id si existe
+      if (currentConversationId) {
+        requestBody.conversation_id = currentConversationId;
+      }
 
       const response = await fetch('/api/query', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          query: queryText,
-          conversation_history: conversationHistory
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       if (!response.ok) {
@@ -105,6 +212,12 @@ export default function Chat() {
 
       const data = await response.json();
       const responseTime = (Date.now() - startTime) / 1000; // en segundos
+
+      // Guardar conversation_id si es una nueva conversación
+      if (data.conversation_id && !currentConversationId) {
+        setCurrentConversationId(data.conversation_id);
+        await loadConversations(); // Recargar lista de conversaciones
+      }
 
       const assistantMessage: Message = {
         role: 'assistant',
@@ -173,7 +286,75 @@ export default function Chat() {
   };
 
   return (
-    <div className="flex flex-col h-[700px]">
+    <div className="flex h-[700px]">
+      {/* Sidebar de conversaciones */}
+      {sidebarOpen && (
+        <div className="w-64 bg-gray-100 dark:bg-gray-800 border-r border-gray-300 dark:border-gray-700 flex flex-col">
+          {/* Header del sidebar */}
+          <div className="p-4 border-b border-gray-300 dark:border-gray-700">
+            <button
+              onClick={createNewConversation}
+              className="w-full px-4 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all duration-200 font-semibold shadow-md hover:shadow-lg flex items-center justify-center gap-2"
+            >
+              <span className="text-xl">➕</span>
+              Nueva Conversación
+            </button>
+          </div>
+
+          {/* Lista de conversaciones */}
+          <div className="flex-1 overflow-y-auto p-2">
+            {conversations.length === 0 ? (
+              <div className="text-center text-gray-500 dark:text-gray-400 text-sm mt-8 px-4">
+                <p className="mb-2">💬</p>
+                <p>No hay conversaciones previas</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {conversations.map((conv) => (
+                  <button
+                    key={conv.conversation_id}
+                    onClick={() => switchConversation(conv.conversation_id)}
+                    className={`w-full text-left p-3 rounded-lg transition-all duration-200 ${
+                      conv.conversation_id === currentConversationId
+                        ? 'bg-blue-100 dark:bg-blue-900/40 border-2 border-blue-500 dark:border-blue-400'
+                        : 'bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-sm font-medium truncate ${
+                          conv.conversation_id === currentConversationId
+                            ? 'text-blue-700 dark:text-blue-300'
+                            : 'text-gray-900 dark:text-white'
+                        }`}>
+                          {conv.title || 'Sin título'}
+                        </p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                          {conv.message_count} mensaje{conv.message_count !== 1 ? 's' : ''}
+                        </p>
+                        <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
+                          {new Date(conv.updated_at).toLocaleDateString('es-ES', {
+                            month: 'short',
+                            day: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}
+                        </p>
+                      </div>
+                      {conv.conversation_id === currentConversationId && (
+                        <span className="text-blue-500 dark:text-blue-400 text-lg">✓</span>
+                      )}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Main chat area */}
+      <div className="flex-1 flex flex-col">
       {/* Header con estadísticas mejoradas */}
       {messages.length > 0 && (
         <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-gray-800 dark:to-gray-700 border-b border-gray-200 dark:border-gray-600 px-6 py-4">
@@ -181,6 +362,14 @@ export default function Chat() {
             {/* Primera fila: Stats y botón */}
             <div className="flex justify-between items-center">
               <div className="flex gap-6 items-center">
+                {/* Toggle sidebar button */}
+                <button
+                  onClick={() => setSidebarOpen(!sidebarOpen)}
+                  className="p-2 bg-white dark:bg-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors border border-gray-300 dark:border-gray-600"
+                  title={sidebarOpen ? 'Ocultar conversaciones' : 'Mostrar conversaciones'}
+                >
+                  <span className="text-xl">{sidebarOpen ? '◀️' : '▶️'}</span>
+                </button>
                 {/* Contador de mensajes */}
                 <div className="flex items-center gap-2">
                   <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center">
@@ -476,6 +665,8 @@ export default function Chat() {
           <span>{input.length}/500 caracteres</span>
         </div>
       </form>
+      </div>
+      {/* End of main chat area */}
     </div>
   );
 }
