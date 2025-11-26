@@ -2,11 +2,20 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(request: NextRequest) {
   try {
-    const { query, conversation_history } = await request.json();
+    const body = await request.json();
+    const { action, query, conversation_id, user_id } = body;
 
-    if (!query || typeof query !== 'string') {
+    // Validar según la acción
+    if (action === 'query' && (!query || typeof query !== 'string')) {
       return NextResponse.json(
-        { error: 'Query is required and must be a string' },
+        { error: 'Query is required and must be a string for query action' },
+        { status: 400 }
+      );
+    }
+
+    if (action === 'load_conversation' && !conversation_id) {
+      return NextResponse.json(
+        { error: 'conversation_id is required for load_conversation action' },
         { status: 400 }
       );
     }
@@ -21,22 +30,37 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Preparar request body para Lambda
+    const lambdaBody: any = {
+      action: action || 'query',
+      user_id: user_id || 'anonymous'
+    };
+
+    // Agregar parámetros según la acción
+    if (action === 'query' || !action) {
+      lambdaBody.query = query;
+      if (conversation_id) {
+        lambdaBody.conversation_id = conversation_id;
+      }
+    } else if (action === 'load_conversation') {
+      lambdaBody.conversation_id = conversation_id;
+    }
+
+    console.log('Sending to Lambda:', JSON.stringify(lambdaBody, null, 2));
+
     const response = await fetch(lambdaUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        query,
-        conversation_history: conversation_history || []
-      }),
+      body: JSON.stringify(lambdaBody),
     });
 
     if (!response.ok) {
       const errorText = await response.text();
       console.error('Lambda error:', response.status, errorText);
       return NextResponse.json(
-        { error: 'Failed to process query', details: errorText },
+        { error: 'Failed to process request', details: errorText },
         { status: response.status }
       );
     }

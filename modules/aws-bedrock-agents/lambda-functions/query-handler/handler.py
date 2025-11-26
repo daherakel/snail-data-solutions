@@ -69,9 +69,17 @@ logger = setup_logging()
 def detect_user_intent(text: str) -> str:
     """
     Detecta la intención del usuario para adaptar la respuesta
-    Returns: intent type (search, summarize, explain, list, compare, question)
+    Returns: intent type (search, summarize, explain, list, compare, question, thanks, greeting)
     """
     text_lower = text.lower().strip()
+
+    # Agradecimientos y cortesías (más prioritario)
+    if is_thanks_or_courtesy(text_lower):
+        return 'thanks'
+
+    # Saludos
+    if re.search(r'^(hola|hi|hey|buenas|buenos días|buenas tardes|buenas noches|saludos)[\s\!¡]?$', text_lower):
+        return 'greeting'
 
     # Intent patterns
     if re.search(r'(resume|resumen|resumir|sintetiza|sintetizar|overview)', text_lower):
@@ -91,6 +99,31 @@ def detect_user_intent(text: str) -> str:
 
     # Default: question
     return 'question'
+
+
+def is_thanks_or_courtesy(text: str) -> bool:
+    """
+    Detecta agradecimientos y expresiones de cortesía
+    """
+    text_lower = text.lower().strip()
+
+    # Patrones de agradecimiento
+    thanks_patterns = [
+        r'^(muchas\s+)?gracias(\s+(lindo|genial|perfecto|excelente))?[\s\!¡\.]*$',
+        r'^(perfecto|genial|excelente|buenísimo|ok|okay|bien|de\s+lujo)[\s\!¡\.]*$',
+        r'^(perfecto|genial|excelente)\s+(muchas\s+)?gracias[\s\!¡\.]*$',
+        r'^gracias(\s+(por|x))?\s+(todo|la\s+ayuda|tu\s+ayuda|la\s+info)[\s\!¡\.]*$',
+        r'^muy\s+(bien|bueno|útil|claro)[\s\!¡\.]*$',
+        r'^(te|le)\s+agradezco[\s\!¡\.]*$',
+        r'^eso\s+es\s+todo[\s\!¡\.]*$',
+        r'^nada\s+más[\s\!¡\.]*$',
+    ]
+
+    for pattern in thanks_patterns:
+        if re.search(pattern, text_lower):
+            return True
+
+    return False
 
 
 def get_available_documents(metadata_list: List[Dict[str, Any]]) -> List[str]:
@@ -1048,6 +1081,74 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         # 2. Detectar intención del usuario
         user_intent = detect_user_intent(query)
         logger.info(f"Intent detectado: {user_intent}")
+
+        # 2.1. Manejar agradecimientos y saludos (sin RAG)
+        if user_intent == 'thanks':
+            thanks_responses = [
+                "¡De nada! Si necesitas algo más, pregunta nomás.",
+                "¡Un placer! Aquí estoy si necesitas más info.",
+                "¡Para eso estoy! Cualquier otra duda, avisame.",
+                "¡Con gusto! ¿Necesitas saber algo más?",
+            ]
+            import random
+            answer = random.choice(thanks_responses)
+
+            save_message(
+                conversation_id=conversation_id,
+                role='assistant',
+                content=answer,
+                title=conversation_title
+            )
+
+            return {
+                'statusCode': 200,
+                'headers': {
+                    'Content-Type': 'application/json',
+                    'Access-Control-Allow-Origin': '*'
+                },
+                'body': json.dumps({
+                    'conversation_id': conversation_id,
+                    'query': query,
+                    'answer': answer,
+                    'sources': [],
+                    'user_intent': 'thanks',
+                    'usage': {'input_tokens': 0, 'output_tokens': 0, 'total_tokens': 0},
+                    'cached': False
+                }, ensure_ascii=False)
+            }
+
+        if user_intent == 'greeting':
+            greeting_responses = [
+                "¡Hola! ¿En qué te puedo ayudar hoy?",
+                "¡Hey! Preguntame lo que necesites sobre los documentos.",
+                "¡Buenas! ¿Qué info buscas?",
+            ]
+            import random
+            answer = random.choice(greeting_responses)
+
+            save_message(
+                conversation_id=conversation_id,
+                role='assistant',
+                content=answer,
+                title=conversation_title
+            )
+
+            return {
+                'statusCode': 200,
+                'headers': {
+                    'Content-Type': 'application/json',
+                    'Access-Control-Allow-Origin': '*'
+                },
+                'body': json.dumps({
+                    'conversation_id': conversation_id,
+                    'query': query,
+                    'answer': answer,
+                    'sources': [],
+                    'user_intent': 'greeting',
+                    'usage': {'input_tokens': 0, 'output_tokens': 0, 'total_tokens': 0},
+                    'cached': False
+                }, ensure_ascii=False)
+            }
 
         # 3. Revisar cache de DynamoDB
         cached_response = get_from_cache(query)
