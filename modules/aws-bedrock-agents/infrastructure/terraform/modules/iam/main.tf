@@ -166,6 +166,7 @@ resource "aws_iam_role_policy" "lambda_query_handler" {
           "dynamodb:GetItem",
           "dynamodb:PutItem",
           "dynamodb:UpdateItem",
+          "dynamodb:DeleteItem",
           "dynamodb:Query"
         ]
         Resource = [
