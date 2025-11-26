@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { action, query, conversation_id, user_id } = body;
+    const { action, query, conversation_id, user_id, new_title } = body;
 
     // Validar según la acción
     if (action === 'query' && (!query || typeof query !== 'string')) {
@@ -16,6 +16,20 @@ export async function POST(request: NextRequest) {
     if (action === 'load_conversation' && !conversation_id) {
       return NextResponse.json(
         { error: 'conversation_id is required for load_conversation action' },
+        { status: 400 }
+      );
+    }
+
+    if (action === 'delete_conversation' && !conversation_id) {
+      return NextResponse.json(
+        { error: 'conversation_id is required for delete_conversation action' },
+        { status: 400 }
+      );
+    }
+
+    if (action === 'update_title' && (!conversation_id || !new_title)) {
+      return NextResponse.json(
+        { error: 'conversation_id and new_title are required for update_title action' },
         { status: 400 }
       );
     }
@@ -44,6 +58,11 @@ export async function POST(request: NextRequest) {
       }
     } else if (action === 'load_conversation') {
       lambdaBody.conversation_id = conversation_id;
+    } else if (action === 'delete_conversation') {
+      lambdaBody.conversation_id = conversation_id;
+    } else if (action === 'update_title') {
+      lambdaBody.conversation_id = conversation_id;
+      lambdaBody.new_title = new_title;
     }
 
     console.log('Sending to Lambda:', JSON.stringify(lambdaBody, null, 2));

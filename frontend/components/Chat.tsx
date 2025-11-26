@@ -42,6 +42,8 @@ export default function Chat() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [editingConvId, setEditingConvId] = useState<string | null>(null);
+  const [editingTitle, setEditingTitle] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Cargar tokens del localStorage al iniciar
@@ -159,6 +161,83 @@ export default function Chat() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // Eliminar conversación
+  const deleteConversation = async (conversationId: string, e: React.MouseEvent) => {
+    e.stopPropagation(); // Evitar que se active el click del botón padre
+
+    if (!confirm('¿Estás seguro de que quieres eliminar esta conversación?')) {
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/query', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'delete_conversation',
+          conversation_id: conversationId,
+          user_id: 'anonymous'
+        }),
+      });
+
+      if (response.ok) {
+        // Si era la conversación actual, limpiar
+        if (conversationId === currentConversationId) {
+          setCurrentConversationId(null);
+          setMessages([]);
+          setTotalTokensUsed(0);
+        }
+        // Recargar lista de conversaciones
+        await loadConversations();
+      }
+    } catch (error) {
+      console.error('Error deleting conversation:', error);
+      alert('Error al eliminar la conversación');
+    }
+  };
+
+  // Iniciar edición de título
+  const startEditTitle = (conv: Conversation, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setEditingConvId(conv.conversation_id);
+    setEditingTitle(conv.title);
+  };
+
+  // Guardar nuevo título
+  const saveTitle = async (conversationId: string) => {
+    if (!editingTitle.trim()) {
+      setEditingConvId(null);
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/query', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'update_title',
+          conversation_id: conversationId,
+          new_title: editingTitle.trim(),
+          user_id: 'anonymous'
+        }),
+      });
+
+      if (response.ok) {
+        setEditingConvId(null);
+        await loadConversations();
+      }
+    } catch (error) {
+      console.error('Error updating title:', error);
+      alert('Error al actualizar el título');
+    }
+  };
+
+  // Cancelar edición
+  const cancelEdit = () => {
+    setEditingConvId(null);
+    setEditingTitle('');
   };
 
   // Calcular mensajes en contexto
@@ -311,41 +390,96 @@ export default function Chat() {
             ) : (
               <div className="space-y-2">
                 {conversations.map((conv) => (
-                  <button
+                  <div
                     key={conv.conversation_id}
-                    onClick={() => switchConversation(conv.conversation_id)}
                     className={`w-full text-left p-3 rounded-lg transition-all duration-200 ${
                       conv.conversation_id === currentConversationId
                         ? 'bg-blue-100 dark:bg-blue-900/40 border-2 border-blue-500 dark:border-blue-400'
                         : 'bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
                     }`}
                   >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex-1 min-w-0">
-                        <p className={`text-sm font-medium truncate ${
-                          conv.conversation_id === currentConversationId
-                            ? 'text-blue-700 dark:text-blue-300'
-                            : 'text-gray-900 dark:text-white'
-                        }`}>
-                          {conv.title || 'Sin título'}
-                        </p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                          {conv.message_count} mensaje{conv.message_count !== 1 ? 's' : ''}
-                        </p>
-                        <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
-                          {new Date(conv.updated_at).toLocaleDateString('es-ES', {
-                            month: 'short',
-                            day: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit'
-                          })}
-                        </p>
+                    {editingConvId === conv.conversation_id ? (
+                      // Modo edición
+                      <div className="flex flex-col gap-2">
+                        <input
+                          type="text"
+                          value={editingTitle}
+                          onChange={(e) => setEditingTitle(e.target.value)}
+                          onKeyPress={(e) => {
+                            if (e.key === 'Enter') saveTitle(conv.conversation_id);
+                            if (e.key === 'Escape') cancelEdit();
+                          }}
+                          className="w-full px-2 py-1 text-sm border border-blue-500 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                          autoFocus
+                        />
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => saveTitle(conv.conversation_id)}
+                            className="flex-1 px-2 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600"
+                          >
+                            Guardar
+                          </button>
+                          <button
+                            onClick={cancelEdit}
+                            className="flex-1 px-2 py-1 bg-gray-300 dark:bg-gray-600 text-gray-700 dark:text-gray-200 text-xs rounded hover:bg-gray-400 dark:hover:bg-gray-500"
+                          >
+                            Cancelar
+                          </button>
+                        </div>
                       </div>
-                      {conv.conversation_id === currentConversationId && (
-                        <span className="text-blue-500 dark:text-blue-400 text-lg">✓</span>
-                      )}
-                    </div>
-                  </button>
+                    ) : (
+                      // Modo normal
+                      <div
+                        onClick={() => switchConversation(conv.conversation_id)}
+                        className="cursor-pointer"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <p className={`text-sm font-medium truncate ${
+                              conv.conversation_id === currentConversationId
+                                ? 'text-blue-700 dark:text-blue-300'
+                                : 'text-gray-900 dark:text-white'
+                            }`}>
+                              {conv.title || 'Sin título'}
+                            </p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                              {conv.message_count} mensaje{conv.message_count !== 1 ? 's' : ''}
+                            </p>
+                            <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
+                              {new Date(conv.updated_at).toLocaleDateString('es-ES', {
+                                month: 'short',
+                                day: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })}
+                            </p>
+                          </div>
+                          <div className="flex flex-col gap-1">
+                            {conv.conversation_id === currentConversationId && (
+                              <span className="text-blue-500 dark:text-blue-400 text-lg">✓</span>
+                            )}
+                          </div>
+                        </div>
+                        {/* Botones de acción */}
+                        <div className="flex gap-1 mt-2 pt-2 border-t border-gray-200 dark:border-gray-600">
+                          <button
+                            onClick={(e) => startEditTitle(conv, e)}
+                            className="flex-1 px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-xs rounded hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors"
+                            title="Editar título"
+                          >
+                            ✏️ Editar
+                          </button>
+                          <button
+                            onClick={(e) => deleteConversation(conv.conversation_id, e)}
+                            className="flex-1 px-2 py-1 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 text-xs rounded hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors"
+                            title="Eliminar conversación"
+                          >
+                            🗑️ Eliminar
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 ))}
               </div>
             )}

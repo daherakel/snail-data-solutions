@@ -900,6 +900,98 @@ def list_conversations(user_id: str = 'anonymous', limit: int = 50) -> List[Dict
         return []
 
 
+def delete_conversation(conversation_id: str, user_id: str = 'anonymous') -> bool:
+    """
+    Borra una conversación completa (todos sus mensajes)
+    Returns: True si fue exitoso, False si falló
+    """
+    if not CONVERSATIONS_TABLE_NAME:
+        logger.warning("CONVERSATIONS_TABLE_NAME no configurado")
+        return False
+
+    try:
+        # Primero obtener todos los mensajes de la conversación
+        response = dynamodb_client.query(
+            TableName=CONVERSATIONS_TABLE_NAME,
+            KeyConditionExpression='conversation_id = :conv_id',
+            ExpressionAttributeValues={
+                ':conv_id': {'S': conversation_id}
+            }
+        )
+
+        # Borrar cada mensaje
+        items = response.get('Items', [])
+        for item in items:
+            message_id = item.get('message_id', {}).get('S', '')
+            if message_id:
+                dynamodb_client.delete_item(
+                    TableName=CONVERSATIONS_TABLE_NAME,
+                    Key={
+                        'conversation_id': {'S': conversation_id},
+                        'message_id': {'S': message_id}
+                    }
+                )
+
+        logger.info(f"Conversación {conversation_id} borrada ({len(items)} mensajes)")
+        return True
+
+    except Exception as e:
+        logger.error(f"Error borrando conversación {conversation_id}: {e}")
+        return False
+
+
+def update_conversation_title(conversation_id: str, new_title: str, user_id: str = 'anonymous') -> bool:
+    """
+    Actualiza el título de una conversación
+    Returns: True si fue exitoso, False si falló
+    """
+    if not CONVERSATIONS_TABLE_NAME:
+        logger.warning("CONVERSATIONS_TABLE_NAME no configurado")
+        return False
+
+    try:
+        # Obtener el primer mensaje (que tiene el título)
+        response = dynamodb_client.query(
+            TableName=CONVERSATIONS_TABLE_NAME,
+            KeyConditionExpression='conversation_id = :conv_id',
+            ExpressionAttributeValues={
+                ':conv_id': {'S': conversation_id}
+            },
+            Limit=1,
+            ScanIndexForward=True  # Orden ascendente para obtener el primero
+        )
+
+        items = response.get('Items', [])
+        if not items:
+            logger.warning(f"No se encontró conversación {conversation_id}")
+            return False
+
+        # Actualizar el título del primer mensaje
+        message_id = items[0].get('message_id', {}).get('S', '')
+        if message_id:
+            dynamodb_client.update_item(
+                TableName=CONVERSATIONS_TABLE_NAME,
+                Key={
+                    'conversation_id': {'S': conversation_id},
+                    'message_id': {'S': message_id}
+                },
+                UpdateExpression='SET title = :title, updated_at = :updated',
+                ExpressionAttributeValues={
+                    ':title': {'S': new_title},
+                    ':updated': {'N': str(int(time.time() * 1000))}
+                }
+            )
+
+            logger.info(f"Título actualizado para conversación {conversation_id}: '{new_title}'")
+            return True
+
+        return False
+
+    except Exception as e:
+        logger.error(f"Error actualizando título de conversación {conversation_id}: {e}")
+        return False
+
+
 def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     """
     Handler principal de Lambda con soporte conversacional
@@ -970,6 +1062,47 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 },
                 'body': json.dumps({
                     'messages': messages
+                }, ensure_ascii=False)
+            }
+
+        if action == 'delete_conversation':
+            conversation_id = body.get('conversation_id')
+            user_id = body.get('user_id', 'anonymous')
+
+            if not conversation_id:
+                raise ValueError("conversation_id es requerido para delete_conversation")
+
+            success = delete_conversation(conversation_id, user_id)
+            return {
+                'statusCode': 200 if success else 500,
+                'headers': {
+                    'Content-Type': 'application/json',
+                    'Access-Control-Allow-Origin': '*'
+                },
+                'body': json.dumps({
+                    'success': success,
+                    'message': 'Conversación eliminada' if success else 'Error al eliminar conversación'
+                }, ensure_ascii=False)
+            }
+
+        if action == 'update_title':
+            conversation_id = body.get('conversation_id')
+            new_title = body.get('new_title')
+            user_id = body.get('user_id', 'anonymous')
+
+            if not conversation_id or not new_title:
+                raise ValueError("conversation_id y new_title son requeridos para update_title")
+
+            success = update_conversation_title(conversation_id, new_title, user_id)
+            return {
+                'statusCode': 200 if success else 500,
+                'headers': {
+                    'Content-Type': 'application/json',
+                    'Access-Control-Allow-Origin': '*'
+                },
+                'body': json.dumps({
+                    'success': success,
+                    'message': 'Título actualizado' if success else 'Error al actualizar título'
                 }, ensure_ascii=False)
             }
 
