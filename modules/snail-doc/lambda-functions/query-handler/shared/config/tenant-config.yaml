@@ -1,0 +1,65 @@
+# Tenant Configuration Template
+# Configuración por cliente/tenant para personalización del agente
+
+default:
+  tenant_id: "default"
+  tenant_name: "Default Tenant"
+  
+  # Personalización del agente
+  agent:
+    personality: "warm"  # warm, professional, technical, friendly
+    tone: "conversational"  # conversational, formal, casual
+    language: "es"  # es, en
+    max_response_length: 2048  # tokens
+    temperature: 0.3
+  
+  # Casos de uso habilitados
+  use_cases:
+    - "document_assistant"
+    # - "google_sheets_reader"  # Futuro
+    # - "customer_support"  # Futuro
+  
+  # Integraciones habilitadas
+  integrations:
+    - "web"  # Frontend web siempre habilitado
+    # - "slack"
+    # - "teams"
+    # - "whatsapp"
+    # - "instagram"
+  
+  # Configuración de modelos
+  models:
+    embedding: "amazon.titan-embed-text-v1"
+    llm: "anthropic.claude-3-haiku-20240307-v1:0"
+  
+  # Configuración de RAG
+  rag:
+    max_context_chunks: 5
+    chunk_size: 1000
+    chunk_overlap: 200
+  
+  # Guardrails y límites
+  limits:
+    max_query_length: 500  # caracteres
+    max_conversation_history: 30  # mensajes
+    rate_limit_per_minute: 60
+  
+  # Configuración de prompts personalizados
+  prompts:
+    system_prompt_template: "base"  # base, custom
+    custom_instructions: ""  # Instrucciones adicionales personalizadas
+
+# Ejemplo de configuración para otro tenant
+# client_example:
+#   tenant_id: "client_example"
+#   tenant_name: "Client Example"
+#   agent:
+#     personality: "professional"
+#     tone: "formal"
+#   use_cases:
+#     - "document_assistant"
+#     - "customer_support"
+#   integrations:
+#     - "web"
+#     - "slack"
+

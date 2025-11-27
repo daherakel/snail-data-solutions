@@ -1,0 +1,99 @@
+# Integration Configuration
+# Configuración de integraciones disponibles y sus settings
+
+integrations:
+  web:
+    enabled: true
+    type: "function_url"
+    description: "Frontend web integration (Next.js)"
+    requires_auth: false  # Autenticación manejada por frontend
+    config:
+      cors_enabled: true
+      cors_origins: ["*"]  # Configurar por ambiente en producción
+  
+  slack:
+    enabled: false  # Habilitar por tenant
+    type: "function_url"
+    description: "Slack workspace integration"
+    requires_auth: true
+    auth_method: "signing_secret"
+    config:
+      events:
+        - "message"
+        - "app_mention"
+      scopes:
+        - "chat:write"
+        - "channels:read"
+        - "im:read"
+        - "im:write"
+      environment_variables:
+        - "SLACK_BOT_TOKEN"
+        - "SLACK_SIGNING_SECRET"
+  
+  teams:
+    enabled: false
+    type: "api_gateway"
+    description: "Microsoft Teams integration"
+    requires_auth: true
+    auth_method: "oauth2"
+    config:
+      events:
+        - "message"
+      scopes:
+        - "ChannelMessage.ReadWrite"
+        - "Chat.ReadWrite"
+      environment_variables:
+        - "TEAMS_CLIENT_ID"
+        - "TEAMS_CLIENT_SECRET"
+        - "TEAMS_TENANT_ID"
+  
+  whatsapp:
+    enabled: false
+    type: "api_gateway"
+    description: "WhatsApp Business API integration"
+    requires_auth: true
+    auth_method: "bearer_token"
+    config:
+      provider: "twilio"  # o "meta"
+      events:
+        - "message"
+      environment_variables:
+        - "WHATSAPP_ACCOUNT_SID"
+        - "WHATSAPP_AUTH_TOKEN"
+        - "WHATSAPP_PHONE_NUMBER"
+  
+  instagram:
+    enabled: false
+    type: "api_gateway"
+    description: "Instagram Direct Messages integration"
+    requires_auth: true
+    auth_method: "oauth2"
+    config:
+      events:
+        - "message"
+      scopes:
+        - "instagram_basic"
+        - "pages_messaging"
+      environment_variables:
+        - "INSTAGRAM_APP_ID"
+        - "INSTAGRAM_APP_SECRET"
+        - "INSTAGRAM_PAGE_ACCESS_TOKEN"
+
+# Configuración por ambiente
+environment_settings:
+  dev:
+    web:
+      cors_origins: ["http://localhost:3000"]
+    slack:
+      verify_signature: false  # Para desarrollo local
+  staging:
+    web:
+      cors_origins: ["https://staging.example.com"]
+    slack:
+      verify_signature: true
+  prod:
+    web:
+      cors_origins: ["https://app.example.com"]
+    slack:
+      verify_signature: true
+

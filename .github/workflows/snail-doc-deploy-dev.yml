@@ -1,0 +1,221 @@
+name: Snail Doc - Deploy to Dev
+
+on:
+  push:
+    branches:
+      - develop
+    paths:
+      - 'modules/snail-doc/**'
+      - '.github/workflows/snail-doc-deploy-dev.yml'
+  workflow_dispatch:
+    inputs:
+      skip_tests:
+        description: 'Skip tests before deployment'
+        required: false
+        type: boolean
+        default: false
+
+env:
+  AWS_REGION: us-east-1
+  ENVIRONMENT: dev
+
+jobs:
+  test:
+    name: Run Tests
+    if: ${{ !inputs.skip_tests }}
+    uses: ./.github/workflows/snail-doc-test.yml
+
+  build-lambda-packages:
+    name: Build Lambda Packages
+    runs-on: ubuntu-latest
+    needs: test
+    if: always() && (needs.test.result == 'success' || inputs.skip_tests)
+
+    strategy:
+      matrix:
+        function: [query-handler, pdf-processor]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Copy shared directory
+        run: |
+          cp -r modules/snail-doc/shared modules/snail-doc/lambda-functions/${{ matrix.function }}/
+
+      - name: Install dependencies
+        working-directory: modules/snail-doc/lambda-functions/${{ matrix.function }}
+        run: |
+          pip install -r requirements.txt -t .
+
+      - name: Create deployment package
+        working-directory: modules/snail-doc/lambda-functions/${{ matrix.function }}
+        run: |
+          zip -r ${{ matrix.function }}.zip . -x "*.git*" "tests/*" "__pycache__/*" "*.pyc"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ matrix.function }}-package
+          path: modules/snail-doc/lambda-functions/${{ matrix.function }}/${{ matrix.function }}.zip
+          retention-days: 1
+
+  deploy-lambda:
+    name: Deploy Lambda Functions
+    runs-on: ubuntu-latest
+    needs: build-lambda-packages
+
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Download query-handler package
+        uses: actions/download-artifact@v3
+        with:
+          name: query-handler-package
+          path: ./artifacts
+
+      - name: Download pdf-processor package
+        uses: actions/download-artifact@v3
+        with:
+          name: pdf-processor-package
+          path: ./artifacts
+
+      - name: Deploy query-handler
+        run: |
+          aws lambda update-function-code \
+            --function-name snail-bedrock-dev-query-handler \
+            --zip-file fileb://artifacts/query-handler.zip \
+            --region ${{ env.AWS_REGION }}
+
+          # Wait for update to complete
+          aws lambda wait function-updated \
+            --function-name snail-bedrock-dev-query-handler \
+            --region ${{ env.AWS_REGION }}
+
+          # Attach FAISS layer
+          aws lambda update-function-configuration \
+            --function-name snail-bedrock-dev-query-handler \
+            --layers ${{ secrets.FAISS_LAYER_ARN }} \
+            --region ${{ env.AWS_REGION }}
+
+      - name: Deploy pdf-processor
+        run: |
+          aws lambda update-function-code \
+            --function-name snail-bedrock-dev-pdf-processor \
+            --zip-file fileb://artifacts/pdf-processor.zip \
+            --region ${{ env.AWS_REGION }}
+
+          # Wait for update to complete
+          aws lambda wait function-updated \
+            --function-name snail-bedrock-dev-pdf-processor \
+            --region ${{ env.AWS_REGION }}
+
+          # Attach FAISS layer
+          aws lambda update-function-configuration \
+            --function-name snail-bedrock-dev-pdf-processor \
+            --layers ${{ secrets.FAISS_LAYER_ARN }} \
+            --region ${{ env.AWS_REGION }}
+
+      - name: Run smoke tests
+        run: |
+          # Test query-handler
+          RESPONSE=$(curl -s -X POST "${{ secrets.LAMBDA_URL_DEV }}" \
+            -H "Content-Type: application/json" \
+            -d '{"action":"query","query":"Test deployment","user_id":"ci-cd"}')
+
+          echo "Response: $RESPONSE"
+
+          # Check if response contains expected fields
+          if echo "$RESPONSE" | jq -e '.conversation_id' > /dev/null; then
+            echo "✅ Smoke test passed"
+          else
+            echo "❌ Smoke test failed"
+            exit 1
+          fi
+
+  deploy-infrastructure:
+    name: Deploy Infrastructure (Terraform)
+    runs-on: ubuntu-latest
+    needs: test
+    if: always() && (needs.test.result == 'success' || inputs.skip_tests)
+
+    permissions:
+      id-token: write
+      contents: read
+
+    defaults:
+      run:
+        working-directory: modules/snail-doc/infrastructure/terraform/environments/dev
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.6.0
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Terraform Plan
+        run: |
+          terraform plan -out=tfplan \
+            -var="create_chromadb_layer=false" \
+            -var="chromadb_layer_path="
+
+      - name: Terraform Apply
+        run: terraform apply -auto-approve tfplan
+
+      - name: Save Terraform outputs
+        run: |
+          terraform output -json > terraform-outputs.json
+
+      - name: Upload Terraform outputs
+        uses: actions/upload-artifact@v3
+        with:
+          name: terraform-outputs-dev
+          path: modules/snail-doc/infrastructure/terraform/environments/dev/terraform-outputs.json
+          retention-days: 30
+
+  notify:
+    name: Notify Deployment Status
+    runs-on: ubuntu-latest
+    needs: [deploy-lambda, deploy-infrastructure]
+    if: always()
+
+    steps:
+      - name: Deployment Success
+        if: needs.deploy-lambda.result == 'success' && needs.deploy-infrastructure.result == 'success'
+        run: |
+          echo "✅ Deployment to DEV successful"
+          # Add Slack/Discord notification here if needed
+
+      - name: Deployment Failed
+        if: needs.deploy-lambda.result == 'failure' || needs.deploy-infrastructure.result == 'failure'
+        run: |
+          echo "❌ Deployment to DEV failed"
+          exit 1

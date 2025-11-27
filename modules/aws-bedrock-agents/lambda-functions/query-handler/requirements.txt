@@ -1,4 +1,0 @@
-# Requirements for Query Handler Lambda
-# NOTA: ChromaDB viene del Lambda Layer, no incluir aquí
-
-boto3==1.34.0

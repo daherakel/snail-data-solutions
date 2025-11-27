@@ -1,0 +1,5 @@
+# Requirements for Query Handler Lambda (REFACTORED)
+# NOTA: FAISS viene del Lambda Layer, no incluir aquí
+
+boto3==1.34.0
+PyYAML==6.0.1  # Para cargar configuración desde YAML

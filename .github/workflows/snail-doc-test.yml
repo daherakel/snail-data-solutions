@@ -1,0 +1,151 @@
+name: Snail Doc - Tests
+
+on:
+  pull_request:
+    paths:
+      - 'modules/snail-doc/**'
+      - '.github/workflows/snail-doc-test.yml'
+  push:
+    branches:
+      - main
+      - develop
+    paths:
+      - 'modules/snail-doc/**'
+      - '.github/workflows/snail-doc-test.yml'
+
+jobs:
+  test-query-handler:
+    name: Test Query Handler
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: modules/snail-doc/lambda-functions/query-handler
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Copy shared directory
+        run: |
+          cp -r ../../shared .
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install pytest pytest-cov faiss-cpu
+
+      - name: Run unit tests
+        run: |
+          python -m pytest tests/ -v --cov=. --cov-report=xml --cov-report=term
+        if: always()
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./modules/snail-doc/lambda-functions/query-handler/coverage.xml
+          flags: query-handler
+          name: query-handler-coverage
+        if: always()
+
+  test-pdf-processor:
+    name: Test PDF Processor
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: modules/snail-doc/lambda-functions/pdf-processor
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Copy shared directory
+        run: |
+          cp -r ../../shared .
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install pytest pytest-cov faiss-cpu
+
+      - name: Run unit tests
+        run: |
+          python -m pytest tests/ -v --cov=. --cov-report=xml --cov-report=term
+        if: always()
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./modules/snail-doc/lambda-functions/pdf-processor/coverage.xml
+          flags: pdf-processor
+          name: pdf-processor-coverage
+        if: always()
+
+  lint-python:
+    name: Lint Python Code
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install linting tools
+        run: |
+          pip install flake8 black isort
+
+      - name: Run flake8
+        run: |
+          flake8 modules/snail-doc/lambda-functions/ modules/snail-doc/shared/ --count --select=E9,F63,F7,F82 --show-source --statistics
+          flake8 modules/snail-doc/lambda-functions/ modules/snail-doc/shared/ --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+
+      - name: Check black formatting
+        run: |
+          black --check modules/snail-doc/lambda-functions/ modules/snail-doc/shared/
+
+      - name: Check isort
+        run: |
+          isort --check-only --profile black modules/snail-doc/lambda-functions/ modules/snail-doc/shared/
+
+  terraform-validate:
+    name: Validate Terraform
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: modules/snail-doc/infrastructure/terraform/environments/dev
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.6.0
+
+      - name: Terraform Format Check
+        run: terraform fmt -check -recursive
+
+      - name: Terraform Init
+        run: terraform init -backend=false
+
+      - name: Terraform Validate
+        run: terraform validate

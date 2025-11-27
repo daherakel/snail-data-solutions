@@ -42,16 +42,16 @@ astro dev pytest tests/dags/test_specific_dag.py
   - SQL queries: `include/sql/`
   - Config: `include/config/`
 
-- **AWS Bedrock Module**: `modules/aws-bedrock-agents/` (in development)
+- **Snail Doc Module**: `modules/snail-doc/` (AI Document Assistant)
+  - Frontend: `frontend/` (Next.js UI)
   - Infrastructure: `infrastructure/terraform/`
   - Lambda functions: `lambda-functions/`
-  - Docs: `docs/aws-bedrock-agents/`
 
 ### Key Files to Read First
 - This file (CLAUDE.md) for project context
+- `modules/snail-doc/README.md` for Snail Doc module
 - `modules/airflow-orchestration/README.md` for Airflow setup
-- `modules/aws-bedrock-agents/README.md` for Bedrock module
-- `docs/aws-bedrock-agents/COST_ANALYSIS.md` for AWS cost estimates
+- `docs/COST_AND_SCALING.md` for AWS cost estimates
 
 ## Objetivo del Repositorio
 
@@ -142,47 +142,86 @@ El proyecto está diseñado para ser **completamente modular**. Puedes levantar 
 
 ```
 snail-data-solutions/
-├── modules/                        # Todos los módulos del proyecto
-│   ├── airflow-orchestration/     # Módulo de orquestación con Airflow + dbt
-│   │   ├── dags/                  # DAGs de Airflow
-│   │   │   ├── setup_*            # DAGs de setup/inicialización
-│   │   │   ├── example_*          # DAGs de ejemplo/referencia
-│   │   │   └── dbt_*              # DAGs que ejecutan dbt
-│   │   ├── include/               # Código compartido
-│   │   │   ├── dbt/               # Proyecto dbt
-│   │   │   ├── sql/               # SQL queries
-│   │   │   └── config/            # Configuraciones YAML
-│   │   ├── plugins/               # Plugins de Airflow
-│   │   ├── tests/                 # Tests del módulo
-│   │   ├── Dockerfile             # Imagen de Astronomer
-│   │   ├── requirements.txt       # Dependencias Python
-│   │   ├── Makefile              # Comandos del módulo
-│   │   └── README.md              # Documentación del módulo
+├── modules/                           # Módulos SaaS independientes
+│   ├── snail-doc/                    # 🐌 Asistente AI de documentos
+│   │   ├── frontend/                 # Next.js UI (chat, upload, analytics, admin)
+│   │   │   ├── app/                  # Next.js App Router
+│   │   │   │   ├── api/              # API routes (upload, documents, query, gemini)
+│   │   │   │   ├── globals.css
+│   │   │   │   ├── layout.tsx
+│   │   │   │   └── page.tsx
+│   │   │   ├── components/           # React components
+│   │   │   │   ├── Chat.tsx          # Interfaz de chat conversacional
+│   │   │   │   ├── DocumentUpload.tsx
+│   │   │   │   ├── DocumentList.tsx
+│   │   │   │   ├── Analytics.tsx     # Panel de analytics
+│   │   │   │   └── Admin.tsx         # Panel de administración
+│   │   │   └── README.md
+│   │   │
+│   │   ├── infrastructure/           # IaC con Terraform
+│   │   │   └── terraform/
+│   │   │       ├── modules/          # Módulos reutilizables
+│   │   │       │   ├── s3/
+│   │   │       │   ├── lambda/
+│   │   │       │   ├── dynamodb/
+│   │   │       │   └── eventbridge/
+│   │   │       └── environments/     # dev/staging/prod
+│   │   │
+│   │   ├── lambda-functions/         # AWS Lambda functions
+│   │   │   ├── pdf-processor/        # Procesa PDFs → embeddings FAISS
+│   │   │   ├── query-handler/        # RAG queries (conversacional)
+│   │   │   ├── slack-handler/        # Integración Slack
+│   │   │   └── lambda-layer-chromadb/ # FAISS layer (38 MB)
+│   │   │
+│   │   ├── shared/                   # Código compartido (multi-tenant)
+│   │   │   ├── config/               # Sistema de configuración
+│   │   │   │   ├── tenant-config.yaml
+│   │   │   │   ├── model-config.yaml
+│   │   │   │   └── integration-config.yaml
+│   │   │   ├── prompts/              # Prompts modulares
+│   │   │   │   ├── base_prompts.py
+│   │   │   │   ├── document_assistant.py
+│   │   │   │   └── customer_support.py
+│   │   │   ├── integrations/         # Abstracción de integraciones
+│   │   │   ├── use_cases/            # Abstracción de casos de uso
+│   │   │   ├── tools/                # Sistema de herramientas
+│   │   │   └── utils/                # Utilidades compartidas
+│   │   │
+│   │   ├── config/                   # Configuraciones por tenant
+│   │   │   ├── tenants/              # Config por cliente (futuro)
+│   │   │   └── use-cases/            # Config por caso de uso
+│   │   │
+│   │   ├── templates/                # Templates para nuevos clientes
+│   │   │   ├── tenant-setup.md
+│   │   │   └── terraform.tfvars.example
+│   │   │
+│   │   ├── scripts/                  # Scripts de deployment
+│   │   │   ├── deploy.sh
+│   │   │   ├── upload-document.sh
+│   │   │   ├── test-query.sh
+│   │   │   └── cleanup.sh
+│   │   │
+│   │   ├── docs/                     # Documentación del módulo
+│   │   │   └── integrations/
+│   │   │
+│   │   ├── REPLICABILITY.md          # Guía de replicación
+│   │   ├── DEPLOYMENT_TEMPLATE.md    # Template de deployment
+│   │   └── README.md
 │   │
-│   └── aws-bedrock-agents/        # Módulo de agentes AI con AWS Bedrock
-│       ├── infrastructure/        # IaC con Terraform
-│       │   └── terraform/
-│       │       ├── modules/       # Módulos reutilizables
-│       │       └── environments/  # dev/staging/prod
-│       ├── lambda-functions/      # Código de Lambdas
-│       ├── step-functions/        # Workflows
-│       ├── tests/                 # Tests del módulo
-│       └── README.md              # Documentación del módulo
+│   ├── airflow-orchestration/        # ⚙️ Data pipelines
+│   │   ├── dags/                     # DAGs de Airflow
+│   │   ├── include/                  # dbt, SQL, config
+│   │   └── README.md
+│   │
+│   └── contact-lambda/               # 📧 Formulario de contacto
 │
-├── docs/                           # Documentación general del proyecto
-│   ├── architecture/              # Diagramas y arquitectura
-│   └── aws-bedrock-agents/        # Docs específicos de Bedrock
-│       ├── README.md
-│       ├── ARCHITECTURE.md
-│       └── COST_ANALYSIS.md
+├── docs/                              # Documentación general
+│   ├── DEPLOYMENT.md                 # Guía de deployment
+│   ├── COST_AND_SCALING.md          # Costos y escalamiento
+│   └── archive/                      # Docs históricos
 │
-├── .claude/                        # Configuración de Claude Code
-│   └── commands/
-│       └── init.md
-│
-├── CLAUDE.md                       # Este archivo
-├── README.md                       # README principal
-└── .gitignore
+├── CLAUDE.md                          # Este archivo
+└── README.md                          # README principal
 ```
 
 ### Cómo Levantar Componentes Específicos
@@ -200,19 +239,23 @@ make start
 make dbt-run
 ```
 
-**Módulo AWS Bedrock Agents:**
+**Módulo Snail Doc (AI Document Assistant):**
 ```bash
 # Ver análisis de costos primero
-cat docs/aws-bedrock-agents/COST_ANALYSIS.md
+cat docs/COST_AND_SCALING.md
 
 # Desplegar infraestructura (ambiente dev)
-cd modules/aws-bedrock-agents/infrastructure/terraform/environments/dev
+cd modules/snail-doc/infrastructure/terraform/environments/dev
 terraform init
 terraform plan
 terraform apply
 
+# Iniciar frontend
+cd modules/snail-doc/frontend
+npm install && npm run dev
+
 # Ver documentación completa
-cat modules/aws-bedrock-agents/README.md
+cat modules/snail-doc/README.md
 ```
 
 **DAGs específicos:**
@@ -220,18 +263,19 @@ Los DAGs se pueden activar/desactivar individualmente en la UI de Airflow o medi
 
 ## Módulos del Proyecto
 
-### Módulo AWS Bedrock AI Agents
+### 🐌 Snail Doc - AI Document Assistant
 
-**Descripción**: Solución modular para crear agentes de AI usando AWS Bedrock que procesan y responden consultas sobre diversos tipos de archivos.
+**Descripción**: Asistente inteligente de documentos usando AWS Bedrock con RAG. Procesa PDFs y responde consultas con contexto. Sistema completamente replicable para múltiples clientes/tenants.
 
 **Componentes**:
-- Amazon Bedrock (Claude/Titan) para modelos de lenguaje
-- Knowledge Bases for Amazon Bedrock (RAG)
-- AWS Lambda para procesamiento de documentos
+- Amazon Bedrock (Claude/Llama/Titan) para modelos de lenguaje
+- FAISS para vector search (Facebook AI Similarity Search)
+- AWS Lambda para procesamiento de documentos y queries
 - AWS Step Functions para orquestación de workflows
-- Amazon S3 para almacenamiento (raw → processed)
-- Amazon Textract para OCR
+- Amazon S3 para almacenamiento (raw → processed → faiss-backup)
+- DynamoDB para conversaciones, cache y rate limiting
 - Terraform para IaC multi-ambiente
+- Frontend Next.js con chat UI, analytics y admin
 
 **Tipos de archivos soportados**:
 - PDFs y documentos
@@ -244,34 +288,51 @@ Los DAGs se pueden activar/desactivar individualmente en la UI de Airflow o medi
 - Code assistant para bases de código
 - Data analysis sobre datasets
 - Document processing multi-fuente
+- Customer support conversacional
 
-**Arquitectura**:
-- Pipeline de ingesta: S3 → EventBridge → Step Functions → Lambda → S3 processed → Knowledge Base
-- Agente AI: Bedrock Agent + Knowledge Base + Lambda custom actions
-- Multi-ambiente: dev/staging/prod con Terraform
+**Arquitectura Multi-Tenant**:
+- Sistema de configuración por tenant (shared/config/)
+- Prompts modulares y personalizables (shared/prompts/)
+- Integraciones extensibles (Slack, Teams, WhatsApp, Instagram)
+- Multi-modelo: soporte para Claude, Llama 3.3, Titan
+- Sistema conversacional con historial persistente en DynamoDB
+
+**Features Conversacionales**:
+- ✅ Conversaciones con historial (últimos 30 mensajes)
+- ✅ Detección de intenciones (search, explain, list, compare, thanks, greeting)
+- ✅ Cache de queries en DynamoDB (7 días TTL)
+- ✅ Guardrails y validación de inputs
+- ✅ Follow-up questions automáticas
+- ✅ Sistema de sessiones por usuario
+- ✅ Sanitización de historial para alternancia de roles
 
 **Documentación completa**:
-- Módulo: `modules/aws-bedrock-agents/README.md`
-- Arquitectura: `docs/aws-bedrock-agents/README.md`
-- Costos: `docs/aws-bedrock-agents/COST_ANALYSIS.md`
+- **[Module README](modules/snail-doc/README.md)** - Features & quick start
+- **[REPLICABILITY.md](modules/snail-doc/REPLICABILITY.md)** - Guía completa de replicación multi-tenant
+- **[DEPLOYMENT_TEMPLATE.md](modules/snail-doc/DEPLOYMENT_TEMPLATE.md)** - Template para documentar deployments
+- **[DEPLOYMENT.md](docs/DEPLOYMENT.md)** - Deployment guide (dev/staging/prod)
+- **[COST_AND_SCALING.md](docs/COST_AND_SCALING.md)** - Complete cost analysis
+- **[Frontend](modules/snail-doc/frontend/README.md)** - Next.js chat interface
 
-**Costos estimados mensuales** (ver análisis completo en COST_ANALYSIS.md):
-- MVP/Testing: **$10-30** (Claude Haiku + Pinecone free tier)
-- Producción ligera: **$120-200** (Claude Sonnet + Aurora pgvector)
-- Producción moderada: **$350-450** (Sonnet + OpenSearch 2 OCU)
-- Producción intensiva: **$800-1,200** (Sonnet/Opus + OpenSearch escalado)
+**Costos estimados mensuales** (ver [COST_AND_SCALING.md](docs/COST_AND_SCALING.md)):
+- **POC/Development**: $0.78-$3 (FAISS + Titan Express)
+- **Production Light**: $15-$30 (FAISS + Llama 3.3 70B, 500 queries/month)
+- **Production Moderate**: $120-$200 (FAISS + Claude Sonnet, 5K queries/month)
+- **Production Intensive**: $450-$800 (FAISS or Aurora pgvector + Claude, 20K+ queries/month)
 
-⚠️ **Nota**: El costo principal es el vector store (OpenSearch ~$175/mes mínimo). Para minimizar costos iniciales, usar alternativas como Aurora pgvector ($50-80/mes) o Pinecone free tier.
+✅ **Key advantage**: Using FAISS instead of OpenSearch reduces base cost from $175/month to ~$0.00/month (225x cheaper).
 
-**Estado**: 🔄 En desarrollo
-- ✅ Arquitectura diseñada
-- ✅ Estructura de directorios creada
-- ✅ Documentación base
-- ✅ Análisis completo de costos
-- ✅ Estructura modular documentada
-- ⏳ Módulos de Terraform
-- ⏳ Lambda functions
-- ⏳ Step Functions workflows
+**Estado**: ✅ **Production-Ready v1.1.0 (Nov 2025)**
+- ✅ Infrastructure deployed with Terraform (dev environment)
+- ✅ FAISS vector store implemented (Lambda layer 38 MB)
+- ✅ Lambda functions: pdf-processor, query-handler (conversacional)
+- ✅ DynamoDB: query cache, rate limiting, conversations
+- ✅ EventBridge triggers for automatic PDF processing
+- ✅ Frontend: Next.js with chat UI, conversation management, analytics, admin
+- ✅ Sistema multi-tenant replicable
+- ✅ Soporte para Claude, Llama 3.3, Titan
+- ✅ Sistema conversacional con historial y detección de intents
+- ✅ End-to-end tested and documented
 
 ## Convenciones del Proyecto
 
@@ -378,9 +439,9 @@ Los DAGs se pueden activar/desactivar individualmente en la UI de Airflow o medi
 6. Run: `make dbt-test` to validate
 7. Update documentation in schema.yml
 
-#### Modifying AWS Bedrock Infrastructure
-1. Read existing Terraform modules in `modules/aws-bedrock-agents/infrastructure/terraform/modules/`
-2. Review cost analysis first: `docs/aws-bedrock-agents/COST_ANALYSIS.md`
+#### Modifying Snail Doc Infrastructure
+1. Read existing Terraform modules in `modules/snail-doc/infrastructure/terraform/modules/`
+2. Review cost analysis first: `docs/COST_AND_SCALING.md`
 3. Modify Terraform module or create new one
 4. Update variables in `environments/dev/variables.tf`
 5. Plan: `terraform plan` from environment directory
@@ -607,35 +668,148 @@ make start
 - ✅ AWS CLI configurado y verificado
 
 ### Implementado Recientemente (Nov 2025)
-- ✅ **Módulo AWS Bedrock AI Agents - COMPLETAMENTE DESPLEGADO**
+
+#### v2.0.0 - REFACTORING COMPLETO CON LLM (27 Nov 2025)
+- ✅ **Query Handler Completamente Refactorizado**
+  - **Eliminado 100% del hardcoding**: Removed 150+ regex patterns, 30+ hardcoded responses, 8 regex functions
+  - **Reducción de código**: 1,652 líneas → 711 líneas (-53%)
+  - **Sistema NLP con LLM**: IntentClassifier usando Claude Haiku en lugar de regex
+  - **Configuración externalizada**: Todo configurable vía YAML (shared/config/nlp-config.yaml)
+  - **Prompts modulares**: Sistema de prompts reutilizables (shared/prompts/base_prompts.py)
+  - **Multi-idioma automático**: Sin necesidad de agregar patterns por idioma
+  - **Tolerancia a typos**: Funciona con errores de tipeo gracias a NLP
+  - **Costo adicional mínimo**: Solo $0.0001 por query (clasificación de intención)
+
+- ✅ **Nueva Arquitectura NLP**
+  - `shared/nlp/intent_classifier.py` - Clasificación con Claude Haiku (194 líneas)
+  - `shared/nlp/response_generator.py` - Generación de respuestas modulares (138 líneas)
+  - `shared/nlp/guardrails.py` - Validación config-driven (85 líneas)
+  - `shared/config/nlp-config.yaml` - Configuración completa de NLP
+  - `shared/utils/nlp_config_loader.py` - Loader de configuración YAML
+
+- ✅ **Testing y Documentación**
+  - `test_local.py` - Suite de tests unitarios completa
+  - `local_server.py` - Servidor HTTP local para testing con frontend
+  - `REFACTORING.md` - Comparación detallada antes/después
+  - `LOCAL_TESTING.md` - Guía completa de testing local
+  - `DEPLOYMENT_COMPLETE.md` - Resumen de deployment v2.0.0
+
+- ✅ **Deployment Exitoso a AWS**
+  - Lambda functions actualizadas con código refactorizado
+  - FAISS layer (40 MB) correctamente adjuntado
+  - PyYAML y dependencias instaladas en Lambda package
+  - Imports arreglados para environment de Lambda
+  - Testing end-to-end completo (greeting, document_list, RAG queries)
+  - Frontend configurado con Lambda URL de AWS
+
+- ✅ **Código Obsoleto Eliminado**
+  - handler_old_backup.py (1,651 líneas) - DELETED
+
+#### v1.1.0 - Sistema Conversacional (Nov 2025)
+- ✅ **Módulo Snail Doc - AI Document Assistant - COMPLETAMENTE DESPLEGADO v1.1.0**
   - ✅ Arquitectura diseñada con diagrama de flujo
-  - ✅ Estructura modular documentada (modules/aws-bedrock-agents/)
+  - ✅ Estructura modular documentada (modules/snail-doc/)
   - ✅ Documentación completa del módulo
-  - ✅ Análisis detallado de costos (MVP: $10-30/mes, Prod: $120-1,200/mes)
+  - ✅ Análisis detallado de costos (MVP: $0.78-$3/mes, Prod: $120-$800/mes)
   - ✅ Estrategias de optimización de costos identificadas
-  - ✅ Alternativas de vector store evaluadas (FAISS seleccionado)
+  - ✅ Alternativas de vector store evaluadas (FAISS seleccionado - 66% reducción de Lambda Layer)
+
   - ✅ **Infraestructura Terraform desplegada en AWS (ambiente dev)**
     - S3 buckets (raw, processed, faiss-backup)
-    - DynamoDB tables (query-cache, rate-limiting)
-    - Lambda functions (pdf-processor, query-handler) con FAISS layer
+    - DynamoDB tables (query-cache, rate-limiting, conversations)
+    - Lambda functions (pdf-processor, query-handler) con FAISS layer (38 MB)
     - Step Functions state machine para orquestación
     - EventBridge rules para triggers automáticos
     - IAM roles con permisos correctos
+
   - ✅ **Lambda PDF Processor funcionando** - Procesa PDFs y genera embeddings FAISS
-  - ✅ **Lambda Query Handler funcionando** - Responde consultas con RAG usando Bedrock Claude
-  - ✅ **Cache de queries en DynamoDB** - Optimización de costos funcionando
-  - ✅ **Frontend Next.js desplegado localmente** - UI moderna con chat, upload y analytics
-  - ✅ **Sistema end-to-end probado** - PDF → FAISS → Query → Respuesta con cache
+
+  - ✅ **Lambda Query Handler CONVERSACIONAL (v1.1.0)**
+    - Sistema conversacional con historial (últimos 30 mensajes)
+    - Detección de intenciones (search, explain, list, compare, thanks, greeting)
+    - Cache de queries en DynamoDB (7 días TTL)
+    - Guardrails y validación de inputs
+    - Follow-up questions automáticas
+    - Soporte multi-modelo (Claude, Llama 3.3, Titan)
+    - Sanitización de historial para alternancia de roles
+    - Gestión de conversaciones (create, list, delete, update title)
+
+  - ✅ **Sistema Multi-Tenant Replicable**
+    - Configuración por tenant (shared/config/tenant-config.yaml)
+    - Prompts modulares (shared/prompts/)
+    - Sistema de integraciones extensible (shared/integrations/)
+    - Casos de uso configurables (shared/use_cases/)
+    - Templates para nuevos clientes (templates/)
+    - Documentación de replicabilidad (REPLICABILITY.md)
+
+  - ✅ **Frontend Next.js Modernizado**
+    - Chat UI conversacional con historial
+    - Panel de Analytics (métricas de uso)
+    - Panel de Admin (gestión de documentos)
+    - Upload de documentos con drag & drop
+    - Integración con múltiples APIs (gemini, model, documents, query)
+    - Dark mode automático
+
+  - ✅ **Sistema end-to-end probado** - PDF → FAISS → Query → Respuesta conversacional con cache
   - 🔄 Slack Handler (código listo, requiere credenciales de Slack para deploy)
+
+### Implementado (27 Nov 2025) - CI/CD
+- ✅ **CI/CD Pipeline Completo con GitHub Actions**
+  - Testing workflow (unit tests, linting, Terraform validation)
+  - Dev deployment (automatic on `develop` branch)
+  - Production deployment (manual approval on `main`)
+  - Blue-Green deployments para zero-downtime
+  - Emergency rollback workflow
+  - Comprehensive smoke tests
+  - Error monitoring automático
+  - IAM roles con OIDC para AWS
+  - Documentación completa en `.github/CICD_SETUP.md`
 
 ### Por Implementar
 - ⏳ Templates reutilizables para DAGs comunes
-- ⏳ CI/CD pipeline (GitHub Actions)
 - ⏳ Integración Airflow + AWS (S3, Redshift operators)
 - ⏳ Databricks integration
 - ⏳ Deployment a Astronomer Cloud
-- ⏳ Monitoreo y alertas
+- ⏳ CloudWatch Dashboards y alertas avanzadas
 - ⏳ Catálogo de datos (dbt docs)
+
+## Documentation Quick Reference
+
+### Getting Started
+- **[README.md](README.md)** - Project overview and quick links
+- **[DEPLOYMENT.md](docs/DEPLOYMENT.md)** - Complete deployment guide for all environments
+- **[COST_AND_SCALING.md](docs/COST_AND_SCALING.md)** - Cost analysis and scaling strategies
+
+### Module Documentation
+- **[Snail Doc](modules/snail-doc/README.md)** - AI Document Assistant (architecture, features, quick start)
+- **[Airflow Orchestration](modules/airflow-orchestration/README.md)** - Data pipeline module
+- **[Snail Doc Frontend](modules/snail-doc/frontend/README.md)** - Next.js chat UI documentation
+
+### Reference Documentation
+- **[Archived Evaluations](docs/archive/)** - Historical comparisons (vector DBs, ChromaDB POC)
+- **[Terraform Dev](modules/snail-doc/infrastructure/terraform/environments/dev/README.md)** - Dev environment setup
+- **[Refactoring v2.0.0](modules/snail-doc/REFACTORING.md)** - Complete refactoring documentation (v2.0.0)
+- **[Local Testing](modules/snail-doc/lambda-functions/query-handler/LOCAL_TESTING.md)** - Local testing guide
+- **[Deployment Complete](modules/snail-doc/DEPLOYMENT_COMPLETE.md)** - v2.0.0 deployment summary
+- **[CI/CD Setup Guide](.github/CICD_SETUP.md)** - Complete CI/CD configuration and usage
+- **[GitHub Actions Workflows](.github/README.md)** - Workflows overview
+
+### Quick Navigation
+| Need to... | Go to... |
+|-----------|----------|
+| Deploy the system | [DEPLOYMENT.md](docs/DEPLOYMENT.md) |
+| Understand costs | [COST_AND_SCALING.md](docs/COST_AND_SCALING.md) |
+| Configure frontend | [modules/snail-doc/frontend/README.md](modules/snail-doc/frontend/README.md) |
+| Modify Lambda code | `modules/snail-doc/lambda-functions/` |
+| Change infrastructure | `modules/snail-doc/infrastructure/terraform/` |
+| View archived docs | [docs/archive/](docs/archive/) |
+| Understand refactoring | [REFACTORING.md](modules/snail-doc/REFACTORING.md) |
+| Test locally | [LOCAL_TESTING.md](modules/snail-doc/lambda-functions/query-handler/LOCAL_TESTING.md) |
+| View deployment | [DEPLOYMENT_COMPLETE.md](modules/snail-doc/DEPLOYMENT_COMPLETE.md) |
+| Setup CI/CD | [.github/CICD_SETUP.md](.github/CICD_SETUP.md) |
+| View workflows | [.github/README.md](.github/README.md) |
+
+---
 
 ## Comandos de Claude Code
 
@@ -686,6 +860,6 @@ make clean              # Limpiar todo y empezar fresh
 
 ---
 
-**Última actualización**: 2025-11-25
+**Última actualización**: 2025-11-27
 **Mantenedor**: Snail Data Solutions
-**Versión**: 1.2.0 (AWS Bedrock Agents completamente desplegado)
+**Versión**: 2.3.0 (Snail Doc v2.0.0 + CI/CD Pipeline)

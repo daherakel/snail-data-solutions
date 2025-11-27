@@ -1,0 +1,43 @@
+# Python dependencies (installed via pip install -t .)
+# These should NOT be in Git - only installed during CI/CD or local deployment
+boto3/
+botocore/
+urllib3/
+yaml/
+_yaml/
+dateutil/
+jmespath/
+s3transfer/
+PyPDF2/
+six.py
+*.dist-info/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Virtual environments
+venv/
+env/
+ENV/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+*.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Deployment packages
+*.zip
+
+# Shared directory (copied during deployment)
+# shared/
