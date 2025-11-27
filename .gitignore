@@ -65,3 +65,27 @@ terraform-apply.log
 *.zip
 lambda-layer-chromadb/python/
 build.log
+
+# Terraform additional
+tfplan*
+*.log
+!README.md
+
+# Build artifacts
+chromadb-layer.zip
+faiss-layer.zip
+
+# Node.js
+node_modules/
+.next/
+out/
+
+# Temporary/backup files
+*.tar.gz
+*.bak
+*.backup
+
+# Package managers
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
