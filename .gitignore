@@ -66,6 +66,20 @@ terraform-apply.log
 lambda-layer-chromadb/python/
 build.log
 
+# Lambda function dependencies (installed via pip install -t .)
+# These should NEVER be in Git - only installed during CI/CD
+**/lambda-functions/**/boto3/
+**/lambda-functions/**/botocore/
+**/lambda-functions/**/urllib3/
+**/lambda-functions/**/yaml/
+**/lambda-functions/**/_yaml/
+**/lambda-functions/**/dateutil/
+**/lambda-functions/**/jmespath/
+**/lambda-functions/**/s3transfer/
+**/lambda-functions/**/PyPDF2/
+**/lambda-functions/**/six.py
+**/lambda-functions/**/*.dist-info/
+
 # Terraform additional
 tfplan*
 *.log

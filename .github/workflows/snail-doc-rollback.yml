@@ -1,0 +1,156 @@
+name: Snail Doc - Rollback Production
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to rollback'
+        required: true
+        type: choice
+        options:
+          - dev
+          - prod
+      rollback_type:
+        description: 'What to rollback'
+        required: true
+        type: choice
+        options:
+          - lambda-only
+          - infrastructure-only
+          - full
+      confirm_rollback:
+        description: 'Type "ROLLBACK" to confirm'
+        required: true
+        type: string
+
+jobs:
+  verify-rollback:
+    name: Verify Rollback Request
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check confirmation
+        run: |
+          if [ "${{ inputs.confirm_rollback }}" != "ROLLBACK" ]; then
+            echo "❌ Rollback not confirmed"
+            exit 1
+          fi
+          echo "✅ Rollback confirmed for ${{ inputs.environment }}"
+
+  rollback-lambda:
+    name: Rollback Lambda Functions
+    runs-on: ubuntu-latest
+    needs: verify-rollback
+    if: inputs.rollback_type == 'lambda-only' || inputs.rollback_type == 'full'
+
+    permissions:
+      id-token: write
+      contents: read
+
+    env:
+      AWS_REGION: us-east-1
+
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ inputs.environment == 'prod' && secrets.AWS_DEPLOY_ROLE_ARN_PROD || secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Rollback query-handler to BLUE alias
+        run: |
+          FUNCTION_NAME="snail-bedrock-${{ inputs.environment }}-query-handler"
+
+          # Get BLUE alias version
+          BLUE_VERSION=$(aws lambda get-alias \
+            --function-name "$FUNCTION_NAME" \
+            --name BLUE \
+            --query 'FunctionVersion' \
+            --output text)
+
+          echo "Rolling back to version: $BLUE_VERSION"
+
+          # Update GREEN alias to point to BLUE version
+          aws lambda update-alias \
+            --function-name "$FUNCTION_NAME" \
+            --name GREEN \
+            --function-version "$BLUE_VERSION" \
+            --description "Rollback via GitHub Actions"
+
+          echo "✅ Rolled back $FUNCTION_NAME to version $BLUE_VERSION"
+
+      - name: Verify rollback
+        run: |
+          LAMBDA_URL="${{ inputs.environment == 'prod' && secrets.LAMBDA_URL_PROD || secrets.LAMBDA_URL_DEV }}"
+
+          RESPONSE=$(curl -s -X POST "$LAMBDA_URL" \
+            -H "Content-Type: application/json" \
+            -d '{"action":"query","query":"Test rollback","user_id":"rollback-test"}')
+
+          if echo "$RESPONSE" | jq -e '.conversation_id' > /dev/null; then
+            echo "✅ Rollback verification passed"
+          else
+            echo "❌ Rollback verification failed"
+            exit 1
+          fi
+
+  rollback-infrastructure:
+    name: Rollback Infrastructure
+    runs-on: ubuntu-latest
+    needs: verify-rollback
+    if: inputs.rollback_type == 'infrastructure-only' || inputs.rollback_type == 'full'
+
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout previous version
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.before }}
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ inputs.environment == 'prod' && secrets.AWS_DEPLOY_ROLE_ARN_PROD || secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.6.0
+
+      - name: Terraform Init
+        working-directory: modules/snail-doc/infrastructure/terraform/environments/${{ inputs.environment }}
+        run: terraform init
+
+      - name: Terraform Plan
+        working-directory: modules/snail-doc/infrastructure/terraform/environments/${{ inputs.environment }}
+        run: |
+          terraform plan -out=tfplan-rollback
+
+      - name: Terraform Apply
+        working-directory: modules/snail-doc/infrastructure/terraform/environments/${{ inputs.environment }}
+        run: terraform apply -auto-approve tfplan-rollback
+
+  notify:
+    name: Notify Rollback Status
+    runs-on: ubuntu-latest
+    needs: [rollback-lambda, rollback-infrastructure]
+    if: always()
+
+    steps:
+      - name: Rollback Success
+        if: success()
+        run: |
+          echo "✅ Rollback to previous version successful"
+          echo "Environment: ${{ inputs.environment }}"
+          echo "Type: ${{ inputs.rollback_type }}"
+
+      - name: Rollback Failed
+        if: failure()
+        run: |
+          echo "❌ Rollback failed"
+          echo "Manual intervention required"
+          exit 1

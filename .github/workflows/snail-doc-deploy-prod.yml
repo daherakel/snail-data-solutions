@@ -1,0 +1,327 @@
+name: Snail Doc - Deploy to Production
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'modules/snail-doc/**'
+      - '.github/workflows/snail-doc-deploy-prod.yml'
+  workflow_dispatch:
+    inputs:
+      skip_tests:
+        description: 'Skip tests before deployment'
+        required: false
+        type: boolean
+        default: false
+      confirm_production:
+        description: 'Type "CONFIRM" to deploy to production'
+        required: true
+        type: string
+
+env:
+  AWS_REGION: us-east-1
+  ENVIRONMENT: prod
+
+jobs:
+  verify-confirmation:
+    name: Verify Production Deployment
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
+
+    steps:
+      - name: Check confirmation
+        run: |
+          if [ "${{ inputs.confirm_production }}" != "CONFIRM" ]; then
+            echo "❌ Production deployment not confirmed"
+            echo "Please type CONFIRM to deploy to production"
+            exit 1
+          fi
+          echo "✅ Production deployment confirmed"
+
+  test:
+    name: Run Tests
+    if: ${{ !inputs.skip_tests }}
+    uses: ./.github/workflows/snail-doc-test.yml
+
+  build-lambda-packages:
+    name: Build Lambda Packages
+    runs-on: ubuntu-latest
+    needs: [test, verify-confirmation]
+    if: |
+      always() &&
+      (needs.verify-confirmation.result == 'success' || github.event_name == 'push') &&
+      (needs.test.result == 'success' || inputs.skip_tests || github.event_name == 'push')
+
+    strategy:
+      matrix:
+        function: [query-handler, pdf-processor]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Copy shared directory
+        run: |
+          cp -r modules/snail-doc/shared modules/snail-doc/lambda-functions/${{ matrix.function }}/
+
+      - name: Install dependencies
+        working-directory: modules/snail-doc/lambda-functions/${{ matrix.function }}
+        run: |
+          pip install -r requirements.txt -t .
+
+      - name: Create deployment package
+        working-directory: modules/snail-doc/lambda-functions/${{ matrix.function }}
+        run: |
+          zip -r ${{ matrix.function }}.zip . -x "*.git*" "tests/*" "__pycache__/*" "*.pyc" "local_server.py" "test_local.py"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ matrix.function }}-package-prod
+          path: modules/snail-doc/lambda-functions/${{ matrix.function }}/${{ matrix.function }}.zip
+          retention-days: 7
+
+  deploy-lambda:
+    name: Deploy Lambda Functions to Production
+    runs-on: ubuntu-latest
+    needs: build-lambda-packages
+    environment:
+      name: production
+      url: ${{ secrets.LAMBDA_URL_PROD }}
+
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN_PROD }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Download query-handler package
+        uses: actions/download-artifact@v3
+        with:
+          name: query-handler-package-prod
+          path: ./artifacts
+
+      - name: Download pdf-processor package
+        uses: actions/download-artifact@v3
+        with:
+          name: pdf-processor-package-prod
+          path: ./artifacts
+
+      - name: Create Lambda aliases before deployment
+        run: |
+          # Create/update BLUE alias pointing to current version
+          CURRENT_VERSION=$(aws lambda get-alias \
+            --function-name snail-bedrock-prod-query-handler \
+            --name GREEN \
+            --query 'FunctionVersion' \
+            --output text 2>/dev/null || echo '$LATEST')
+
+          aws lambda update-alias \
+            --function-name snail-bedrock-prod-query-handler \
+            --name BLUE \
+            --function-version "$CURRENT_VERSION" \
+            --region ${{ env.AWS_REGION }} || true
+
+      - name: Deploy query-handler
+        run: |
+          aws lambda update-function-code \
+            --function-name snail-bedrock-prod-query-handler \
+            --zip-file fileb://artifacts/query-handler.zip \
+            --region ${{ env.AWS_REGION }}
+
+          # Wait for update
+          aws lambda wait function-updated \
+            --function-name snail-bedrock-prod-query-handler \
+            --region ${{ env.AWS_REGION }}
+
+          # Attach FAISS layer
+          aws lambda update-function-configuration \
+            --function-name snail-bedrock-prod-query-handler \
+            --layers ${{ secrets.FAISS_LAYER_ARN_PROD }} \
+            --region ${{ env.AWS_REGION }}
+
+          # Publish new version
+          NEW_VERSION=$(aws lambda publish-version \
+            --function-name snail-bedrock-prod-query-handler \
+            --description "Deployed via GitHub Actions - ${{ github.sha }}" \
+            --query 'Version' \
+            --output text)
+
+          echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
+
+      - name: Deploy pdf-processor
+        run: |
+          aws lambda update-function-code \
+            --function-name snail-bedrock-prod-pdf-processor \
+            --zip-file fileb://artifacts/pdf-processor.zip \
+            --region ${{ env.AWS_REGION }}
+
+          aws lambda wait function-updated \
+            --function-name snail-bedrock-prod-pdf-processor \
+            --region ${{ env.AWS_REGION }}
+
+          aws lambda update-function-configuration \
+            --function-name snail-bedrock-prod-pdf-processor \
+            --layers ${{ secrets.FAISS_LAYER_ARN_PROD }} \
+            --region ${{ env.AWS_REGION }}
+
+      - name: Run comprehensive smoke tests
+        run: |
+          # Test 1: Greeting
+          echo "Testing greeting..."
+          RESPONSE=$(curl -s -X POST "${{ secrets.LAMBDA_URL_PROD }}" \
+            -H "Content-Type: application/json" \
+            -d '{"action":"query","query":"Hello","user_id":"ci-cd-prod"}')
+
+          if echo "$RESPONSE" | jq -e '.intent == "greeting"' > /dev/null; then
+            echo "✅ Greeting test passed"
+          else
+            echo "❌ Greeting test failed: $RESPONSE"
+            exit 1
+          fi
+
+          # Test 2: Document list
+          echo "Testing document list..."
+          RESPONSE=$(curl -s -X POST "${{ secrets.LAMBDA_URL_PROD }}" \
+            -H "Content-Type: application/json" \
+            -d '{"action":"query","query":"What documents do you have?","user_id":"ci-cd-prod"}')
+
+          if echo "$RESPONSE" | jq -e '.intent == "document_list"' > /dev/null; then
+            echo "✅ Document list test passed"
+          else
+            echo "❌ Document list test failed: $RESPONSE"
+            exit 1
+          fi
+
+          echo "✅ All smoke tests passed"
+
+      - name: Update GREEN alias to new version
+        run: |
+          aws lambda update-alias \
+            --function-name snail-bedrock-prod-query-handler \
+            --name GREEN \
+            --function-version ${{ env.NEW_VERSION }} \
+            --region ${{ env.AWS_REGION }}
+
+      - name: Monitor for errors (5 min)
+        run: |
+          echo "Monitoring Lambda for errors..."
+          sleep 300
+
+          ERROR_COUNT=$(aws cloudwatch get-metric-statistics \
+            --namespace AWS/Lambda \
+            --metric-name Errors \
+            --dimensions Name=FunctionName,Value=snail-bedrock-prod-query-handler \
+            --start-time $(date -u -d '5 minutes ago' +%Y-%m-%dT%H:%M:%S) \
+            --end-time $(date -u +%Y-%m-%dT%H:%M:%S) \
+            --period 300 \
+            --statistics Sum \
+            --query 'Datapoints[0].Sum' \
+            --output text)
+
+          if [ "$ERROR_COUNT" != "None" ] && [ "$ERROR_COUNT" -gt 5 ]; then
+            echo "⚠️ High error count detected: $ERROR_COUNT errors in last 5 minutes"
+            echo "Consider rolling back to BLUE alias"
+            exit 1
+          fi
+
+          echo "✅ No significant errors detected"
+
+  deploy-infrastructure:
+    name: Deploy Infrastructure to Production
+    runs-on: ubuntu-latest
+    needs: [test, verify-confirmation]
+    if: |
+      always() &&
+      (needs.verify-confirmation.result == 'success' || github.event_name == 'push') &&
+      (needs.test.result == 'success' || inputs.skip_tests || github.event_name == 'push')
+    environment:
+      name: production
+
+    permissions:
+      id-token: write
+      contents: read
+
+    defaults:
+      run:
+        working-directory: modules/snail-doc/infrastructure/terraform/environments/prod
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN_PROD }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.6.0
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Terraform Plan
+        run: |
+          terraform plan -out=tfplan \
+            -var="create_chromadb_layer=false"
+
+      - name: Terraform Apply
+        run: terraform apply -auto-approve tfplan
+
+      - name: Save Terraform outputs
+        run: |
+          terraform output -json > terraform-outputs.json
+
+      - name: Upload Terraform outputs
+        uses: actions/upload-artifact@v3
+        with:
+          name: terraform-outputs-prod
+          path: modules/snail-doc/infrastructure/terraform/environments/prod/terraform-outputs.json
+          retention-days: 90
+
+  notify-success:
+    name: Notify Deployment Success
+    runs-on: ubuntu-latest
+    needs: [deploy-lambda, deploy-infrastructure]
+    if: success()
+
+    steps:
+      - name: Deployment Success
+        run: |
+          echo "🎉 Production deployment successful"
+          echo "Commit: ${{ github.sha }}"
+          echo "Branch: ${{ github.ref }}"
+          # Add Slack/Email notification here
+
+  notify-failure:
+    name: Notify Deployment Failure
+    runs-on: ubuntu-latest
+    needs: [deploy-lambda, deploy-infrastructure]
+    if: failure()
+
+    steps:
+      - name: Deployment Failed
+        run: |
+          echo "❌ Production deployment failed"
+          echo "Commit: ${{ github.sha }}"
+          echo "Check logs for details"
+          # Add Slack/Email notification here
+          exit 1
