@@ -157,8 +157,14 @@ export default function Home() {
       <div className={`w-64 bg-gray-900 text-gray-300 flex flex-col flex-shrink-0 transition-all duration-300 border-r border-gray-800`}>
         {/* Logo Area */}
         <div className="h-16 flex items-center px-6 border-b border-gray-800">
-          <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-lg flex items-center justify-center shadow-lg flex-shrink-0 mr-3">
-            <span className="text-xl">🐌</span>
+          <div className="w-8 h-8 flex items-center justify-center flex-shrink-0 mr-3">
+            <img 
+              src="/snail-data.svg" 
+              alt="Snail Data Logo" 
+              width={32} 
+              height={32}
+              className="object-contain"
+            />
           </div>
           <h1 className="font-bold text-white tracking-wide">Snail Data</h1>
         </div>

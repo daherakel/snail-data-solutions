@@ -1,3 +1,4 @@
+
 # 🐌 Snail Doc - AI Document Assistant
 
 Asistente inteligente de documentos usando AWS Bedrock con RAG (Retrieval Augmented Generation). Procesa PDFs y responde consultas usando búsqueda semántica con FAISS y modelos de Claude.

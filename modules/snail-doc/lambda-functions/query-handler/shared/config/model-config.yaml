@@ -1,0 +1,92 @@
+# Model Configuration
+# Configuración de modelos por ambiente y tenant
+
+environments:
+  dev:
+    default_models:
+      embedding: "amazon.titan-embed-text-v1"
+      llm: "meta.llama3-3-70b-instruct-v1:0"  # Cost-effective para dev
+    
+    available_models:
+      embedding:
+        - id: "amazon.titan-embed-text-v1"
+          provider: "amazon"
+          dimension: 1536
+          cost_per_1k_tokens: 0.0001
+      
+      llm:
+        - id: "meta.llama3-3-70b-instruct-v1:0"
+          provider: "meta"
+          cost_input_per_1k: 0.00099
+          cost_output_per_1k: 0.00099
+        - id: "amazon.titan-text-express-v1"
+          provider: "amazon"
+          cost_input_per_1k: 0.0002
+          cost_output_per_1k: 0.0006
+        - id: "anthropic.claude-3-haiku-20240307-v1:0"
+          provider: "anthropic"
+          cost_input_per_1k: 0.00025
+          cost_output_per_1k: 0.00125
+  
+  staging:
+    default_models:
+      embedding: "amazon.titan-embed-text-v1"
+      llm: "anthropic.claude-3-haiku-20240307-v1:0"
+    
+    available_models:
+      embedding:
+        - id: "amazon.titan-embed-text-v1"
+          provider: "amazon"
+          dimension: 1536
+          cost_per_1k_tokens: 0.0001
+      
+      llm:
+        - id: "anthropic.claude-3-haiku-20240307-v1:0"
+          provider: "anthropic"
+          cost_input_per_1k: 0.00025
+          cost_output_per_1k: 0.00125
+        - id: "anthropic.claude-3-sonnet-20240229-v1:0"
+          provider: "anthropic"
+          cost_input_per_1k: 0.003
+          cost_output_per_1k: 0.015
+  
+  prod:
+    default_models:
+      embedding: "amazon.titan-embed-text-v1"
+      llm: "anthropic.claude-3-5-sonnet-20241022-v2:0"
+    
+    available_models:
+      embedding:
+        - id: "amazon.titan-embed-text-v1"
+          provider: "amazon"
+          dimension: 1536
+          cost_per_1k_tokens: 0.0001
+      
+      llm:
+        - id: "anthropic.claude-3-haiku-20240307-v1:0"
+          provider: "anthropic"
+          cost_input_per_1k: 0.00025
+          cost_output_per_1k: 0.00125
+        - id: "anthropic.claude-3-sonnet-20240229-v1:0"
+          provider: "anthropic"
+          cost_input_per_1k: 0.003
+          cost_output_per_1k: 0.015
+        - id: "anthropic.claude-3-5-sonnet-20241022-v2:0"
+          provider: "anthropic"
+          cost_input_per_1k: 0.003
+          cost_output_per_1k: 0.015
+
+# Modelo recomendado por caso de uso
+use_case_models:
+  document_assistant:
+    recommended_llm: "anthropic.claude-3-haiku-20240307-v1:0"
+    recommended_embedding: "amazon.titan-embed-text-v1"
+  
+  customer_support:
+    recommended_llm: "anthropic.claude-3-5-sonnet-20241022-v2:0"
+    recommended_embedding: "amazon.titan-embed-text-v1"
+  
+  google_sheets_reader:
+    recommended_llm: "anthropic.claude-3-haiku-20240307-v1:0"
+    recommended_embedding: "amazon.titan-embed-text-v1"
+

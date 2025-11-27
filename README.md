@@ -47,31 +47,43 @@ snail-data-solutions/
 
 ## 🐌 Snail Doc - AI Document Assistant
 
-**Asistente inteligente de documentos** usando AWS Bedrock con FAISS vector search.
+**Asistente inteligente de documentos** usando AWS Bedrock con FAISS vector search. Sistema conversacional replicable para múltiples clientes/tenants.
 
-### Features
+### Features v1.1.0
 - ✅ Procesamiento automático de PDFs (S3 → Lambda)
-- ✅ Vector search con FAISS
-- ✅ RAG con Claude para respuestas contextuales
-- ✅ Frontend Next.js con chat
-- ✅ Multi-tenant ready
+- ✅ Vector search con FAISS (38 MB Lambda Layer)
+- ✅ RAG conversacional con Claude/Llama/Titan
+- ✅ Sistema multi-tenant replicable
+- ✅ Historial de conversaciones (DynamoDB)
+- ✅ Cache de queries (7 días TTL)
+- ✅ Detección de intenciones y guardrails
+- ✅ Frontend Next.js con chat, analytics y admin
+- ✅ Soporte multi-modelo (Claude, Llama 3.3, Titan)
 
 ### Quick Start
 
 ```bash
 cd modules/snail-doc
+
+# Deploy completo
 ./scripts/deploy.sh dev
+
+# O manualmente
+cd infrastructure/terraform/environments/dev
+terraform init && terraform apply
 ```
 
 ### Costos Estimados
 
-| Escenario | Costo/mes |
-|-----------|-----------|
-| POC/Dev | $0.78 - $3 |
-| Production Light | $15 - $30 |
-| Production | $120 - $200 |
+| Escenario | Costo/mes | Uso |
+|-----------|-----------|-----|
+| POC/Dev | $0.78 - $3 | Testing |
+| Production Light | $15 - $30 | 500 queries/mes |
+| Production | $120 - $200 | 5K queries/mes |
 
-📚 **Documentación completa**: [modules/snail-doc/README.md](modules/snail-doc/README.md)
+📚 **Documentación completa**:
+- [modules/snail-doc/README.md](modules/snail-doc/README.md) - Features & quick start
+- [modules/snail-doc/REPLICABILITY.md](modules/snail-doc/REPLICABILITY.md) - Guía de replicación multi-tenant
 
 ---
 

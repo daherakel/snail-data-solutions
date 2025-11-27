@@ -1,0 +1,125 @@
+# NLP Configuration
+# Configuración de procesamiento de lenguaje natural y manejo de intenciones
+
+# Configuración del clasificador de intenciones
+intent_classifier:
+  # Modelo a usar para clasificación (Haiku es rápido y barato)
+  model_id: "anthropic.claude-3-haiku-20240307-v1:0"
+
+  # Temperatura para clasificación (baja = más consistente)
+  temperature: 0.3
+
+  # Max tokens para respuesta de clasificación
+  max_tokens: 200
+
+# Definición de intenciones y su comportamiento
+intents:
+  greeting:
+    requires_documents: false
+    use_llm_response: false  # Usa respuestas predefinidas
+    max_response_length: 50
+    cache_enabled: false
+
+  thanks:
+    requires_documents: false
+    use_llm_response: false
+    max_response_length: 50
+    cache_enabled: false
+
+  document_list:
+    requires_documents: true
+    use_llm_response: false  # Respuesta estructurada
+    max_response_length: 500
+    cache_enabled: true
+    cache_ttl_seconds: 3600  # 1 hora
+
+  document_query:
+    requires_documents: true
+    use_llm_response: true
+    max_chunks: 5
+    max_response_length: 300
+    cache_enabled: true
+    cache_ttl_seconds: 604800  # 7 días
+
+  analysis_request:
+    requires_documents: true
+    use_llm_response: true
+    max_chunks: 10
+    max_response_length: 500
+    cache_enabled: true
+    cache_ttl_seconds: 604800
+
+  action_intent:
+    requires_documents: true
+    use_llm_response: true
+    max_chunks: 5
+    max_response_length: 300
+    cache_enabled: true
+    cache_ttl_seconds: 604800
+
+  clarification:
+    requires_documents: false
+    use_llm_response: true
+    max_chunks: 3
+    max_response_length: 200
+    cache_enabled: false
+
+  off_topic:
+    requires_documents: false
+    use_llm_response: false
+    max_response_length: 100
+    cache_enabled: false
+
+# Configuración de búsqueda semántica
+search:
+  default_top_k: 5
+  max_top_k: 20
+  min_similarity_threshold: 0.0  # FAISS usa L2 distance, no similarity score
+
+# Configuración de cache
+cache:
+  enabled: true
+  default_ttl_seconds: 604800  # 7 días
+  normalize_queries: true  # Normalizar queries antes de cachear
+
+# Configuración de respuestas
+responses:
+  max_length: 300  # Máximo general (en palabras)
+  temperature: 0.5  # Temperatura para generación de respuestas
+
+  # Límites por tipo de respuesta
+  limits:
+    greeting: 15  # palabras
+    thanks: 15
+    document_query: 100
+    analysis_request: 150
+    action_intent: 100
+    clarification: 80
+    off_topic: 30
+
+# Guardrails
+guardrails:
+  enabled: true
+  max_query_length: 500  # caracteres
+  blocked_patterns:
+    - "ignore previous instructions"
+    - "ignore all previous"
+    - "disregard all previous"
+    - "forget everything"
+    - "new instructions"
+    - "system prompt"
+
+  rejection_message: "Lo siento, no puedo procesar ese tipo de solicitud. Por favor, haz una pregunta relacionada con los documentos."
+
+# Configuración de idiomas
+languages:
+  default: "es"
+  supported:
+    - "es"
+    - "en"
+
+# Configuración de logging
+logging:
+  log_intent_classification: true
+  log_search_results: true
+  log_cache_hits: true
