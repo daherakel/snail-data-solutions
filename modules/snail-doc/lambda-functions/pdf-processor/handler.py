@@ -11,6 +11,7 @@ import time
 from typing import Any, Dict, List
 
 import boto3
+
 # FAISS for vector search (desde Lambda Layer)
 import faiss
 import numpy as np
