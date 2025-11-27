@@ -43,11 +43,11 @@ locals {
 module "s3" {
   source = "../../modules/s3"
 
-  project_name            = var.project_name
-  environment             = var.environment
-  enable_versioning       = var.enable_s3_versioning
-  enable_lifecycle_rules  = var.enable_s3_lifecycle
-  tags                    = local.common_tags
+  project_name           = var.project_name
+  environment            = var.environment
+  enable_versioning      = var.enable_s3_versioning
+  enable_lifecycle_rules = var.enable_s3_lifecycle
+  tags                   = local.common_tags
 }
 
 # =====================================================
@@ -57,14 +57,14 @@ module "s3" {
 module "dynamodb" {
   source = "../../modules/dynamodb"
 
-  project_name                    = var.project_name
-  environment                     = var.environment
-  billing_mode                    = var.dynamodb_billing_mode
-  enable_rate_limiting            = var.enable_rate_limiting
-  enable_point_in_time_recovery   = var.enable_dynamodb_pitr
-  create_alarms                   = var.create_cloudwatch_alarms
-  cache_ttl_days                  = var.cache_ttl_days
-  tags                            = local.common_tags
+  project_name                  = var.project_name
+  environment                   = var.environment
+  billing_mode                  = var.dynamodb_billing_mode
+  enable_rate_limiting          = var.enable_rate_limiting
+  enable_point_in_time_recovery = var.enable_dynamodb_pitr
+  create_alarms                 = var.create_cloudwatch_alarms
+  cache_ttl_days                = var.cache_ttl_days
+  tags                          = local.common_tags
 }
 
 # =====================================================
@@ -86,17 +86,17 @@ module "conversations" {
 module "iam" {
   source = "../../modules/iam"
 
-  project_name                    = var.project_name
-  environment                     = var.environment
-  aws_region                      = local.aws_region
-  aws_account_id                  = local.aws_account_id
-  raw_documents_bucket_arn        = module.s3.raw_documents_bucket_arn
-  processed_documents_bucket_arn  = module.s3.processed_documents_bucket_arn
-  chromadb_backup_bucket_arn      = module.s3.chromadb_backup_bucket_arn
-  query_cache_table_arn           = module.dynamodb.query_cache_table_arn
-  rate_limit_table_arn            = module.dynamodb.rate_limit_table_arn
-  conversations_table_arn         = module.conversations.table_arn
-  tags                            = local.common_tags
+  project_name                   = var.project_name
+  environment                    = var.environment
+  aws_region                     = local.aws_region
+  aws_account_id                 = local.aws_account_id
+  raw_documents_bucket_arn       = module.s3.raw_documents_bucket_arn
+  processed_documents_bucket_arn = module.s3.processed_documents_bucket_arn
+  chromadb_backup_bucket_arn     = module.s3.chromadb_backup_bucket_arn
+  query_cache_table_arn          = module.dynamodb.query_cache_table_arn
+  rate_limit_table_arn           = module.dynamodb.rate_limit_table_arn
+  conversations_table_arn        = module.conversations.table_arn
+  tags                           = local.common_tags
 }
 
 # =====================================================
@@ -106,13 +106,13 @@ module "iam" {
 module "lambda" {
   source = "../../modules/lambda"
 
-  project_name                    = var.project_name
-  environment                     = var.environment
-  aws_region                      = local.aws_region
+  project_name = var.project_name
+  environment  = var.environment
+  aws_region   = local.aws_region
 
   # IAM Roles
-  lambda_pdf_processor_role_arn   = module.iam.lambda_pdf_processor_role_arn
-  lambda_query_handler_role_arn   = module.iam.lambda_query_handler_role_arn
+  lambda_pdf_processor_role_arn = module.iam.lambda_pdf_processor_role_arn
+  lambda_query_handler_role_arn = module.iam.lambda_query_handler_role_arn
 
   # S3 Buckets
   raw_documents_bucket_name       = module.s3.raw_documents_bucket_name
@@ -120,38 +120,38 @@ module "lambda" {
   chromadb_backup_bucket_name     = module.s3.chromadb_backup_bucket_name
 
   # Lambda Source Directories
-  pdf_processor_source_dir        = var.pdf_processor_source_dir
-  query_handler_source_dir        = var.query_handler_source_dir
+  pdf_processor_source_dir = var.pdf_processor_source_dir
+  query_handler_source_dir = var.query_handler_source_dir
 
   # Lambda Configuration
-  pdf_processor_timeout           = var.pdf_processor_timeout
-  pdf_processor_memory            = var.pdf_processor_memory
-  query_handler_timeout           = var.query_handler_timeout
-  query_handler_memory            = var.query_handler_memory
+  pdf_processor_timeout = var.pdf_processor_timeout
+  pdf_processor_memory  = var.pdf_processor_memory
+  query_handler_timeout = var.query_handler_timeout
+  query_handler_memory  = var.query_handler_memory
 
   # Bedrock Configuration
-  bedrock_llm_model_id            = var.bedrock_llm_model_id
-  max_context_chunks              = var.max_context_chunks
+  bedrock_llm_model_id = var.bedrock_llm_model_id
+  max_context_chunks   = var.max_context_chunks
 
   # DynamoDB Cache Configuration
-  query_cache_table_name          = module.dynamodb.query_cache_table_name
-  cache_ttl_seconds               = module.dynamodb.cache_ttl_seconds
-  enable_query_cache              = var.enable_query_cache
+  query_cache_table_name = module.dynamodb.query_cache_table_name
+  cache_ttl_seconds      = module.dynamodb.cache_ttl_seconds
+  enable_query_cache     = var.enable_query_cache
 
   # DynamoDB Conversations Configuration
-  conversations_table_name        = module.conversations.table_name
-  max_history_messages            = var.max_history_messages
+  conversations_table_name = module.conversations.table_name
+  max_history_messages     = var.max_history_messages
 
   # Layer
-  create_chromadb_layer           = var.create_chromadb_layer
-  chromadb_layer_path             = var.chromadb_layer_path
+  create_chromadb_layer = var.create_chromadb_layer
+  chromadb_layer_path   = var.chromadb_layer_path
 
   # Logging
-  log_level                       = var.lambda_log_level
-  log_retention_days              = var.log_retention_days
+  log_level          = var.lambda_log_level
+  log_retention_days = var.log_retention_days
 
   # Function URL
-  create_function_url             = var.create_function_url
+  create_function_url = var.create_function_url
 
   tags = local.common_tags
 }
@@ -163,15 +163,15 @@ module "lambda" {
 module "step_functions" {
   source = "../../modules/step-functions"
 
-  project_name               = var.project_name
-  environment                = var.environment
-  step_functions_role_arn    = module.iam.step_functions_role_arn
-  pdf_processor_lambda_arn   = module.lambda.pdf_processor_invoke_arn
-  log_level                  = var.step_functions_log_level
-  log_retention_days         = var.log_retention_days
-  enable_xray                = var.enable_xray
-  create_alarms              = var.create_cloudwatch_alarms
-  tags                       = local.common_tags
+  project_name             = var.project_name
+  environment              = var.environment
+  step_functions_role_arn  = module.iam.step_functions_role_arn
+  pdf_processor_lambda_arn = module.lambda.pdf_processor_invoke_arn
+  log_level                = var.step_functions_log_level
+  log_retention_days       = var.log_retention_days
+  enable_xray              = var.enable_xray
+  create_alarms            = var.create_cloudwatch_alarms
+  tags                     = local.common_tags
 }
 
 # =====================================================
@@ -181,10 +181,10 @@ module "step_functions" {
 module "eventbridge" {
   source = "../../modules/eventbridge"
 
-  project_name                = var.project_name
-  environment                 = var.environment
-  raw_documents_bucket_name   = module.s3.raw_documents_bucket_name
-  step_functions_arn          = module.step_functions.state_machine_arn
-  eventbridge_role_arn        = module.iam.eventbridge_role_arn
-  tags                        = local.common_tags
+  project_name              = var.project_name
+  environment               = var.environment
+  raw_documents_bucket_name = module.s3.raw_documents_bucket_name
+  step_functions_arn        = module.step_functions.state_machine_arn
+  eventbridge_role_arn      = module.iam.eventbridge_role_arn
+  tags                      = local.common_tags
 }

@@ -17,6 +17,7 @@ def test_handler_import():
     # Set required environment variables
     os.environ['ENVIRONMENT'] = 'test'
     os.environ['AWS_DEFAULT_REGION'] = 'us-east-1'
+    os.environ['RAW_BUCKET'] = 'test-raw-bucket'
     os.environ['PROCESSED_BUCKET'] = 'test-processed-bucket'
     os.environ['FAISS_BACKUP_BUCKET'] = 'test-faiss-bucket'
     os.environ['FAISS_INDEX_KEY'] = 'test-index'

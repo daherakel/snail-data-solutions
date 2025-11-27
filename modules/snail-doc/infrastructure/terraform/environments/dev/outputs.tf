@@ -67,7 +67,7 @@ output "eventbridge_rule_name" {
 
 output "quick_start" {
   description = "Instrucciones para empezar a usar el sistema"
-  value = <<-EOT
+  value       = <<-EOT
 
     ========================================
     AWS Bedrock Agents - DEV Environment

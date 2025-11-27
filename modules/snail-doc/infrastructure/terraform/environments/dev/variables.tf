@@ -41,7 +41,7 @@ variable "enable_s3_versioning" {
 variable "enable_s3_lifecycle" {
   description = "Habilitar lifecycle rules (archivado a Glacier)"
   type        = bool
-  default     = false  # Deshabilitado en dev
+  default     = false # Deshabilitado en dev
 }
 
 # =====================================================
@@ -51,7 +51,7 @@ variable "enable_s3_lifecycle" {
 variable "dynamodb_billing_mode" {
   description = "DynamoDB billing mode (PAY_PER_REQUEST or PROVISIONED)"
   type        = string
-  default     = "PAY_PER_REQUEST"  # On-demand for variable workloads
+  default     = "PAY_PER_REQUEST" # On-demand for variable workloads
 }
 
 variable "enable_rate_limiting" {
@@ -97,13 +97,13 @@ variable "query_handler_source_dir" {
 variable "pdf_processor_timeout" {
   description = "Timeout para PDF processor (segundos)"
   type        = number
-  default     = 300  # 5 minutos
+  default     = 300 # 5 minutos
 }
 
 variable "pdf_processor_memory" {
   description = "Memoria para PDF processor (MB)"
   type        = number
-  default     = 1024  # 1 GB
+  default     = 1024 # 1 GB
 }
 
 variable "query_handler_timeout" {
@@ -121,7 +121,7 @@ variable "query_handler_memory" {
 variable "create_chromadb_layer" {
   description = "Crear Lambda layer con ChromaDB"
   type        = bool
-  default     = false  # Se crea manualmente primero
+  default     = false # Se crea manualmente primero
 }
 
 variable "chromadb_layer_path" {
@@ -137,7 +137,7 @@ variable "chromadb_layer_path" {
 variable "bedrock_llm_model_id" {
   description = "Model ID de Bedrock para LLM"
   type        = string
-  default     = "anthropic.claude-3-haiku-20240307-v1:0"  # Haiku para dev (más barato)
+  default     = "anthropic.claude-3-haiku-20240307-v1:0" # Haiku para dev (más barato)
 }
 
 variable "max_context_chunks" {
@@ -159,13 +159,13 @@ variable "max_history_messages" {
 variable "lambda_log_level" {
   description = "Nivel de logging para Lambda (DEBUG, INFO, WARNING, ERROR)"
   type        = string
-  default     = "DEBUG"  # DEBUG en dev
+  default     = "DEBUG" # DEBUG en dev
 }
 
 variable "step_functions_log_level" {
   description = "Nivel de logging para Step Functions (ALL, ERROR, FATAL, OFF)"
   type        = string
-  default     = "ALL"  # ALL en dev
+  default     = "ALL" # ALL en dev
 }
 
 variable "log_retention_days" {
@@ -181,13 +181,13 @@ variable "log_retention_days" {
 variable "enable_xray" {
   description = "Habilitar AWS X-Ray"
   type        = bool
-  default     = false  # Deshabilitado en dev para reducir costos
+  default     = false # Deshabilitado en dev para reducir costos
 }
 
 variable "create_cloudwatch_alarms" {
   description = "Crear alarmas de CloudWatch"
   type        = bool
-  default     = false  # Deshabilitado en dev
+  default     = false # Deshabilitado en dev
 }
 
 # =====================================================
@@ -197,5 +197,5 @@ variable "create_cloudwatch_alarms" {
 variable "create_function_url" {
   description = "Crear Function URL para query handler"
   type        = bool
-  default     = true  # Habilitado en dev para testing fácil
+  default     = true # Habilitado en dev para testing fácil
 }

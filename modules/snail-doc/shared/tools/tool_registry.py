@@ -3,7 +3,7 @@ Tool Registry
 Registro de herramientas disponibles para el agente
 """
 
-from typing import Dict, List, Optional, Type
+from typing import Any, Dict, List, Optional, Type
 from abc import ABC, abstractmethod
 import logging
 
