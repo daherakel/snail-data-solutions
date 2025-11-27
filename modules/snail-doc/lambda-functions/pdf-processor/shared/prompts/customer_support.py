@@ -4,7 +4,8 @@ Prompts específicos para el caso de uso de atención al cliente
 (Plantilla para futuro uso)
 """
 
-from typing import Dict, Any, Optional, List
+from typing import Any, Dict, List, Optional
+
 from .base_prompts import BasePrompts
 
 

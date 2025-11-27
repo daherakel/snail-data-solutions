@@ -4,9 +4,10 @@ These tests verify the handler can be imported and basic functionality works.
 """
 
 import json
-import pytest
 import os
 import sys
+
+import pytest
 
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
@@ -47,9 +48,9 @@ def test_event_structure():
 def test_nlp_modules_exist():
     """Test that NLP modules can be imported."""
     try:
+        from shared.nlp.guardrails import Guardrails
         from shared.nlp.intent_classifier import IntentClassifier
         from shared.nlp.response_generator import ResponseGenerator
-        from shared.nlp.guardrails import Guardrails
 
         assert True
     except ImportError as e:

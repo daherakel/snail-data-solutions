@@ -3,10 +3,11 @@ NLP Config Loader
 Carga y parsea configuración de NLP desde archivos YAML
 """
 
-import yaml
-import os
-from typing import Dict, Any, Optional
 import logging
+import os
+from typing import Any, Dict, Optional
+
+import yaml
 
 logger = logging.getLogger(__name__)
 

@@ -3,19 +3,18 @@ Lambda Function: PDF Processor
 Procesa PDFs, extrae texto, genera embeddings con Bedrock y guarda en FAISS index
 """
 
+import hashlib
 import json
 import os
 import pickle
-import hashlib
 import time
-from typing import Dict, List, Any
+from typing import Any, Dict, List
 
 import boto3
-from PyPDF2 import PdfReader
-import numpy as np
-
 # FAISS for vector search (desde Lambda Layer)
 import faiss
+import numpy as np
+from PyPDF2 import PdfReader
 
 # Cache de embeddings en memoria
 EMBEDDINGS_CACHE = {}

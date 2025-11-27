@@ -4,8 +4,8 @@ Permite testear el handler sin necesidad de deployar a AWS
 """
 
 import json
-import sys
 import os
+import sys
 
 # Agregar el directorio actual al path para imports
 sys.path.insert(0, os.path.dirname(__file__))

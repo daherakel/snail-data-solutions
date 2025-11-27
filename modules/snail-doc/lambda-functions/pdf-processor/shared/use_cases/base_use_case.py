@@ -3,9 +3,9 @@ Base Use Case
 Clase abstracta base para todos los casos de uso
 """
 
-from abc import ABC, abstractmethod
-from typing import Dict, Any, Optional, List
 import logging
+from abc import ABC, abstractmethod
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 

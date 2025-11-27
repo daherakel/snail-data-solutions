@@ -3,9 +3,9 @@ Tool Registry
 Registro de herramientas disponibles para el agente
 """
 
-from typing import Any, Dict, List, Optional, Type
-from abc import ABC, abstractmethod
 import logging
+from abc import ABC, abstractmethod
+from typing import Any, Dict, List, Optional, Type
 
 logger = logging.getLogger(__name__)
 

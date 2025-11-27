@@ -3,10 +3,10 @@ Base Integration
 Clase abstracta base para todas las integraciones
 """
 
-from abc import ABC, abstractmethod
-from typing import Dict, Any, Optional, List
 import json
 import logging
+from abc import ABC, abstractmethod
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 

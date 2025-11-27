@@ -3,9 +3,9 @@ Guardrails
 Sistema de validación y guardrails para queries
 """
 
-import re
 import logging
-from typing import Tuple, Optional, Dict, Any
+import re
+from typing import Any, Dict, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 

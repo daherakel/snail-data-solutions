@@ -5,7 +5,7 @@ Usa LLM para detectar intenciones del usuario de forma robusta (sin regex hardco
 
 import json
 import logging
-from typing import Dict, Any, List, Optional
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 

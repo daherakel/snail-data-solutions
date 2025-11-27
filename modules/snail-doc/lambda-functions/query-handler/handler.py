@@ -9,27 +9,27 @@ CAMBIOS PRINCIPALES:
 - Código limpio y mantenible (~400 líneas vs 1650)
 """
 
+import hashlib
 import json
 import os
 import pickle
-import hashlib
+import sys
 import time
 import uuid
-import sys
-from typing import Dict, List, Any, Optional
+from typing import Any, Dict, List, Optional
 
 import boto3
-import numpy as np
 import faiss
+import numpy as np
 
 # Agregar shared/ al path para imports
 # En Lambda, shared está en el mismo directorio que handler.py
 sys.path.insert(0, os.path.dirname(__file__))
 
-from shared.prompts.base_prompts import BasePrompts
+from shared.nlp.guardrails import Guardrails
 from shared.nlp.intent_classifier import IntentClassifier
 from shared.nlp.response_generator import ResponseGenerator
-from shared.nlp.guardrails import Guardrails
+from shared.prompts.base_prompts import BasePrompts
 from shared.utils.nlp_config_loader import NLPConfigLoader
 
 # =====================================================
