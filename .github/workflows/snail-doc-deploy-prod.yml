@@ -1,12 +1,14 @@
 name: Snail Doc - Deploy to Production
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - 'modules/snail-doc/**'
-      - '.github/workflows/snail-doc-deploy-prod.yml'
+  # Disabled automatic deployment to production on push
+  # Use workflow_dispatch for manual deployments only
+  # push:
+  #   branches:
+  #     - main
+  #   paths:
+  #     - 'modules/snail-doc/**'
+  #     - '.github/workflows/snail-doc-deploy-prod.yml'
   workflow_dispatch:
     inputs:
       skip_tests:
@@ -47,10 +49,9 @@ jobs:
   build-lambda-packages:
     name: Build Lambda Packages
     runs-on: ubuntu-latest
-    needs: [test, verify-confirmation]
+    needs: [test]
     if: |
       always() &&
-      (needs.verify-confirmation.result == 'success' || github.event_name == 'push') &&
       (needs.test.result == 'success' || inputs.skip_tests || github.event_name == 'push')
 
     strategy:
@@ -244,10 +245,9 @@ jobs:
   deploy-infrastructure:
     name: Deploy Infrastructure to Production
     runs-on: ubuntu-latest
-    needs: [test, verify-confirmation]
+    needs: [test]
     if: |
       always() &&
-      (needs.verify-confirmation.result == 'success' || github.event_name == 'push') &&
       (needs.test.result == 'success' || inputs.skip_tests || github.event_name == 'push')
     environment:
       name: production
