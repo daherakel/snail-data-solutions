@@ -140,13 +140,25 @@ def get_available_documents(metadata_list: List[Dict[str, Any]]) -> List[str]:
 def is_document_list_request(text: str) -> bool:
     """
     Detecta si el usuario está pidiendo ver la lista de documentos
+    Incluye formas informales y abreviadas
     """
     text_lower = text.lower().strip()
+    
+    # Normalizar abreviaciones comunes
+    text_normalized = text_lower
+    text_normalized = re.sub(r'\bq\b', 'que', text_normalized)  # "q" -> "que"
+    text_normalized = re.sub(r'\bdocs?\b', 'documentos', text_normalized)  # "doc/docs" -> "documentos"
+    text_normalized = re.sub(r'\bk\b', 'que', text_normalized)  # "k" -> "que"
 
     patterns = [
-        # Preguntas directas sobre documentos
-        r'(qué|que|cuáles|cuales)\s+(documentos|archivos|pdfs?)\s+(tienes|tenes|hay|están|estan|disponibles)',
+        # Preguntas directas (incluyendo formas informales)
+        r'(qué|que|cuáles|cuales|ke)\s+(documentos|archivos|pdfs?)\s+(tienes|tenes|hay|están|estan|disponibles)',
         r'(documentos|archivos|pdfs?)\s+(tienes|tenes|hay|disponibles)',
+        
+        # Formas muy informales/cortas
+        r'^(que|qué|ke|q)\s+(documentos|docs?)\s+(tenes|tienes)',
+        r'^(documentos|docs?)\s+(tenes|tienes)',
+        r'(tenes|tienes)\s+(documentos|docs?)',
 
         # Solicitudes de listar
         r'(lista|listar|mostrar|enumerar)\s+.*?(documentos|archivos|pdfs?)',
@@ -166,10 +178,38 @@ def is_document_list_request(text: str) -> bool:
         r'títulos?\s+(de\s+los\s+)?(documentos|archivos)',
     ]
 
+    # Probar con texto original y normalizado
     for pattern in patterns:
-        if re.search(pattern, text_lower):
+        if re.search(pattern, text_lower) or re.search(pattern, text_normalized):
             return True
     return False
+
+
+def fuzzy_match_score(query_words: List[str], doc_words: List[str]) -> float:
+    """
+    Calcula un score de similitud entre palabras del query y del documento
+    Usa coincidencia parcial para tolerar typos
+    """
+    if not query_words or not doc_words:
+        return 0.0
+    
+    matches = 0
+    for qword in query_words:
+        for dword in doc_words:
+            # Match exacto
+            if qword == dword:
+                matches += 1
+                break
+            # Match parcial (para typos): si comparten 70%+ de caracteres
+            elif len(qword) >= 3 and len(dword) >= 3:
+                # Calcular caracteres en común
+                common = sum(1 for c in qword if c in dword)
+                similarity = common / max(len(qword), len(dword))
+                if similarity >= 0.6:  # 60% de similitud mínima
+                    matches += 0.8  # Dar menos peso que match exacto
+                    break
+    
+    return matches / len(query_words) if query_words else 0.0
 
 
 def detect_specific_document_query(query: str, available_docs: List[str]) -> Optional[str]:
@@ -177,28 +217,44 @@ def detect_specific_document_query(query: str, available_docs: List[str]) -> Opt
     Detecta si el usuario pregunta sobre un documento específico por nombre
     Returns: nombre del documento si se detecta, None en caso contrario
 
-    Estrategia: Buscar si el nombre de algún documento aparece en el query,
-    priorizando el match más largo (más específico)
+    Estrategia: 
+    1. Match exacto (nombre completo en query)
+    2. Fuzzy matching para tolerar typos y variaciones
     """
     query_lower = query.lower().strip()
+    
+    # Limpiar query de palabras comunes
+    stop_words = {'de', 'que', 'trata', 'sobre', 'el', 'la', 'los', 'las', 'un', 'una', 'es', 'son', 'cual', 'cuál', 'me', 'puedes', 'podes', 'decir', 'hablar', 'explicar', 'documento', 'archivo'}
+    query_words = [w for w in re.split(r'[\s\-_]+', query_lower) if w and w not in stop_words and len(w) > 1]
 
-    # Buscar todos los documentos que aparecen en el query
-    # Priorizar el documento con el nombre más largo (más específico)
+    # 1. Buscar match exacto primero
     matches = []
-
     for doc in available_docs:
         doc_lower = doc.lower()
-
-        # Verificar si el nombre del documento aparece en el query
-        # (ignorando mayúsculas y con cierta flexibilidad para símbolos)
         if doc_lower in query_lower:
-            matches.append((doc, len(doc_lower)))
+            matches.append((doc, 1.0, len(doc_lower)))
 
-    # Si hay matches, devolver el más largo (más específico)
     if matches:
-        matches.sort(key=lambda x: x[1], reverse=True)
-        logger.info(f"Documento específico detectado: {matches[0][0]}")
+        matches.sort(key=lambda x: (x[1], x[2]), reverse=True)
+        logger.info(f"Documento detectado (match exacto): {matches[0][0]}")
         return matches[0][0]
+
+    # 2. Fuzzy matching para typos
+    fuzzy_matches = []
+    for doc in available_docs:
+        doc_lower = doc.lower()
+        doc_words = [w for w in re.split(r'[\s\-_]+', doc_lower) if w and len(w) > 1]
+        
+        score = fuzzy_match_score(query_words, doc_words)
+        if score >= 0.5:  # Al menos 50% de match
+            fuzzy_matches.append((doc, score))
+            logger.info(f"Fuzzy match: '{doc}' con score {score:.2f}")
+
+    if fuzzy_matches:
+        fuzzy_matches.sort(key=lambda x: x[1], reverse=True)
+        best_match = fuzzy_matches[0]
+        logger.info(f"Documento detectado (fuzzy): {best_match[0]} (score: {best_match[1]:.2f})")
+        return best_match[0]
 
     return None
 
@@ -649,38 +705,31 @@ def generate_rag_response(
     }
 
     # System prompt conversacional y amigable
-    system_prompt = """Sos un asistente cálido, profesional y moderno. Tu tarea es leer los documentos disponibles y responder únicamente en base a su contenido. No inventes información ni respondas sobre temas que no aparezcan en los documentos. Tu objetivo es ayudar al usuario de manera natural, útil y breve.
+    system_prompt = """Sos un asistente conversacional, cálido y directo. Respondés sobre los documentos cargados de forma natural y breve, como si chatearas con un amigo.
 
-Identificá la intención del usuario y actuá así:
+🎯 TU ESTILO:
+- Respuestas CORTAS: máximo 2-3 oraciones
+- Tono casual pero profesional
+- Directo al punto, sin rodeos
+- Usá emojis con moderación
 
-1. greeting - Saludá de forma cercana y positiva.
-   Ejemplo: ¡Hola! 👋 ¿En qué puedo ayudarte hoy?
+📋 CÓMO RESPONDER:
+- Pregunta simple → Respuesta simple (1-2 oraciones)
+- "De qué trata X?" → Resumen en 2-3 oraciones máximo
+- Saludo → Respuesta amigable corta
+- No está en docs → "No tengo esa info en los documentos 🤷"
 
-2. document_query - Cuando el usuario pregunte por información contenida en los documentos (conceptos, datos, procesos, definiciones, pasos), respondé de forma clara y directa, siempre basándote únicamente en lo leído.
-   Ejemplo: Según el documento, el proceso comienza con una validación inicial de datos...
+❌ NUNCA:
+- Respuestas largas tipo ensayo
+- Listas de más de 3 items
+- Frases formales como "Según los documentos disponibles..."
+- Inventar información
 
-3. analysis_request - Si el usuario pide un análisis, resumen o explicación, ofrecé una respuesta sencilla y bien organizada, sin agregar contenido que no exista en los documentos.
-   Ejemplo: Te resumo lo que indica el archivo: ...
-
-4. action_intent - Si el usuario quiere aplicar la información, tomar una decisión o avanzar con un paso mencionado en los documentos, orientalo y guiá la acción según lo que el material permita.
-   Ejemplo: El documento indica que el siguiente paso sería completar el formulario...
-
-5. limitations - Si el usuario pregunta por algo que no está en los documentos, o que excede su alcance, respondé con claridad y amabilidad.
-   Ejemplo: Perdón 🙏, esa información no aparece en los documentos disponibles.
-
-6. complaint - Si el usuario expresa confusión o problema con la información, respondé con empatía y ofrecé aclararla.
-   Ejemplo: Lamento la confusión 😔. Si querés, reviso el documento y te explico nuevamente.
-
-7. other - Si el usuario pide temas totalmente ajenos (política, chistes, consejos personales, opiniones, etc.), mantené el límite de forma amable.
-   Ejemplo: Lo siento 🙏, solo puedo ayudarte con lo que está en los documentos.
-
-⚠️ REGLAS IMPORTANTES:
-• Nunca digas que sos un asistente virtual ni un modelo de lenguaje
-• No inventes información. Si un dato no está en los documentos, decí que no aparece
-• Mantené siempre un tono cálido, amable, profesional y conversacional
-• Respuestas de máximo 3 frases
-• Respondé siempre en español
-• Tu conocimiento se limita exclusivamente a los documentos cargados"""
+✅ SIEMPRE:
+- Ir al grano
+- Ser conversacional
+- Responder en español
+- Máximo 50 palabras por respuesta"""
 
     # Construir el prompt completo
     user_prompt = f"""{history_context}
@@ -714,10 +763,10 @@ Responde de forma natural y conversacional basándote SOLO en el contexto."""
 
             request_body = {
                 "anthropic_version": "bedrock-2023-05-31",
-                "max_tokens": MAX_TOKENS_PER_RESPONSE,
+                "max_tokens": 150,  # Forzar respuestas cortas (máximo ~100 palabras)
                 "system": system_prompt,
                 "messages": messages,
-                "temperature": 0.3
+                "temperature": 0.5  # Un poco más creativo para respuestas naturales
             }
 
         elif is_llama:
@@ -736,8 +785,8 @@ Responde de forma natural y conversacional basándote SOLO en el contexto."""
 
             request_body = {
                 "prompt": full_prompt,
-                "max_gen_len": MAX_TOKENS_PER_RESPONSE,
-                "temperature": 0.3,
+                "max_gen_len": 150,  # Forzar respuestas cortas
+                "temperature": 0.5,
                 "top_p": 0.9
             }
 
@@ -765,8 +814,8 @@ Responde de forma natural y conversacional basándote SOLO en el contexto."""
             request_body = {
                 "inputText": full_prompt,
                 "textGenerationConfig": {
-                    "maxTokenCount": 300,  # Reducido para evitar repeticiones
-                    "temperature": 0.3,    # Más determinístico para evitar divagaciones
+                    "maxTokenCount": 150,  # Forzar respuestas cortas
+                    "temperature": 0.5,
                     "topP": 0.8
                 }
             }
