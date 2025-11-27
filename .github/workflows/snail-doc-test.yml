@@ -122,7 +122,7 @@ jobs:
 
       - name: Check isort
         run: |
-          isort --check-only modules/snail-doc/lambda-functions/ modules/snail-doc/shared/
+          isort --check-only --profile black modules/snail-doc/lambda-functions/ modules/snail-doc/shared/
 
   terraform-validate:
     name: Validate Terraform
