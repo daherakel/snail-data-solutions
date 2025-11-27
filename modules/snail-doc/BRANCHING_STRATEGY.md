@@ -93,3 +93,9 @@ git push
 ---
 
 **Última actualización**: 2025-11-27
+
+## Status
+
+✅ CI/CD Pipeline completamente configurado y funcionando
+✅ Deploy automático a Dev en push a develop
+✅ Deploy automático a Prod en push a main
