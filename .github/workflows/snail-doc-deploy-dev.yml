@@ -22,14 +22,14 @@ env:
 jobs:
   test:
     name: Run Tests
-    if: ${{ !inputs.skip_tests }}
+    if: ${{ github.event_name == 'push' || !inputs.skip_tests }}
     uses: ./.github/workflows/snail-doc-test.yml
 
   build-lambda-packages:
     name: Build Lambda Packages
     runs-on: ubuntu-latest
     needs: test
-    if: always() && (needs.test.result == 'success' || inputs.skip_tests)
+    if: always() && (needs.test.result == 'success' || (github.event_name == 'workflow_dispatch' && inputs.skip_tests))
 
     strategy:
       matrix:
