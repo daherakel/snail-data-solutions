@@ -80,7 +80,7 @@ jobs:
           zip -r ${{ matrix.function }}.zip . -x "*.git*" "tests/*" "__pycache__/*" "*.pyc" "local_server.py" "test_local.py"
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.function }}-package-prod
           path: modules/snail-doc/lambda-functions/${{ matrix.function }}/${{ matrix.function }}.zip
@@ -109,13 +109,13 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Download query-handler package
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: query-handler-package-prod
           path: ./artifacts
 
       - name: Download pdf-processor package
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: pdf-processor-package-prod
           path: ./artifacts
@@ -289,7 +289,7 @@ jobs:
           terraform output -json > terraform-outputs.json
 
       - name: Upload Terraform outputs
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: terraform-outputs-prod
           path: modules/snail-doc/infrastructure/terraform/environments/prod/terraform-outputs.json
