@@ -1,14 +1,12 @@
 name: Snail Doc - Deploy to Production
 
 on:
-  # Disabled automatic deployment to production on push
-  # Use workflow_dispatch for manual deployments only
-  # push:
-  #   branches:
-  #     - main
-  #   paths:
-  #     - 'modules/snail-doc/**'
-  #     - '.github/workflows/snail-doc-deploy-prod.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'modules/snail-doc/**'
+      - '.github/workflows/snail-doc-deploy-prod.yml'
   workflow_dispatch:
     inputs:
       skip_tests:
@@ -43,7 +41,7 @@ jobs:
 
   test:
     name: Run Tests
-    if: ${{ !inputs.skip_tests }}
+    if: ${{ github.event_name == 'push' || !inputs.skip_tests }}
     uses: ./.github/workflows/snail-doc-test.yml
 
   build-lambda-packages:

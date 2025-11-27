@@ -12,6 +12,7 @@ on:
     paths:
       - 'modules/snail-doc/**'
       - '.github/workflows/snail-doc-test.yml'
+  workflow_call:  # Makes this workflow reusable by other workflows
 
 jobs:
   test-query-handler:
