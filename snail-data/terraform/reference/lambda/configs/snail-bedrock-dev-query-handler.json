@@ -1,0 +1,61 @@
+{
+    "FunctionName": "snail-bedrock-dev-query-handler",
+    "FunctionArn": "arn:aws:lambda:us-east-1:471112687668:function:snail-bedrock-dev-query-handler",
+    "Runtime": "python3.11",
+    "Role": "arn:aws:iam::471112687668:role/snail-bedrock-dev-lambda-query-handler",
+    "Handler": "handler.lambda_handler",
+    "CodeSize": 14156917,
+    "Description": "",
+    "Timeout": 60,
+    "MemorySize": 512,
+    "LastModified": "2025-11-27T20:20:59.000+0000",
+    "CodeSha256": "lqnSDO8jxAAwujWk79X9L+JwR+bJWrSYo+IdNiBs42w=",
+    "Version": "$LATEST",
+    "Environment": {
+        "Variables": {
+            "MAX_CONTEXT_CHUNKS": "5",
+            "ENVIRONMENT": "dev",
+            "CACHE_TTL_SECONDS": "604800",
+            "ENABLE_CACHE": "true",
+            "BEDROCK_LLM_MODEL_ID": "anthropic.claude-3-haiku-20240307-v1:0",
+            "MAX_HISTORY_MESSAGES": "10",
+            "FAISS_METADATA_KEY": "faiss_metadata.pkl",
+            "CONVERSATIONS_TABLE_NAME": "snail-bedrock-dev-conversations",
+            "FAISS_INDEX_KEY": "faiss_index.bin",
+            "FAISS_BACKUP_BUCKET": "snail-bedrock-dev-chromadb-backup",
+            "BEDROCK_EMBEDDING_MODEL_ID": "amazon.titan-embed-text-v1",
+            "LOG_LEVEL": "DEBUG",
+            "CACHE_TABLE_NAME": "snail-bedrock-dev-query-cache"
+        }
+    },
+    "TracingConfig": {
+        "Mode": "PassThrough"
+    },
+    "RevisionId": "1dc03798-0181-4809-967c-0dcfbabe51b2",
+    "Layers": [
+        {
+            "Arn": "arn:aws:lambda:us-east-1:471112687668:layer:snail-bedrock-dev-faiss-layer:1",
+            "CodeSize": 40189971
+        }
+    ],
+    "State": "Active",
+    "LastUpdateStatus": "Successful",
+    "PackageType": "Zip",
+    "Architectures": [
+        "x86_64"
+    ],
+    "EphemeralStorage": {
+        "Size": 512
+    },
+    "SnapStart": {
+        "ApplyOn": "None",
+        "OptimizationStatus": "Off"
+    },
+    "RuntimeVersionConfig": {
+        "RuntimeVersionArn": "arn:aws:lambda:us-east-1::runtime:621ac689144ea9bc996443b608b02d97cdd92d2c95af1da8c74a08767be04952"
+    },
+    "LoggingConfig": {
+        "LogFormat": "Text",
+        "LogGroup": "/aws/lambda/snail-bedrock-dev-query-handler"
+    }
+}

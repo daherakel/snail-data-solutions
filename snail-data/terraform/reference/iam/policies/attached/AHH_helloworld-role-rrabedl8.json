@@ -1,0 +1,28 @@
+{
+    "AttachedPolicies": [
+        {
+            "PolicyName": "AWSLambdaBasicExecutionRole-ad003b1f-f67a-4579-bb2c-65743a35d90e",
+            "PolicyArn": "arn:aws:iam::471112687668:policy/service-role/AWSLambdaBasicExecutionRole-ad003b1f-f67a-4579-bb2c-65743a35d90e"
+        },
+        {
+            "PolicyName": "AmazonTranscribeFullAccess",
+            "PolicyArn": "arn:aws:iam::aws:policy/AmazonTranscribeFullAccess"
+        },
+        {
+            "PolicyName": "TranslateFullAccess",
+            "PolicyArn": "arn:aws:iam::aws:policy/TranslateFullAccess"
+        },
+        {
+            "PolicyName": "ComprehendMedicalFullAccess",
+            "PolicyArn": "arn:aws:iam::aws:policy/ComprehendMedicalFullAccess"
+        },
+        {
+            "PolicyName": "AmazonS3FullAccess",
+            "PolicyArn": "arn:aws:iam::aws:policy/AmazonS3FullAccess"
+        },
+        {
+            "PolicyName": "AWSLambda_FullAccess",
+            "PolicyArn": "arn:aws:iam::aws:policy/AWSLambda_FullAccess"
+        }
+    ]
+}

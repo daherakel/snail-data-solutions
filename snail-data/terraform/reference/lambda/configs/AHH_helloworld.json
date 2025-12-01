@@ -1,0 +1,38 @@
+{
+    "FunctionName": "AHH_helloworld",
+    "FunctionArn": "arn:aws:lambda:us-east-1:471112687668:function:AHH_helloworld",
+    "Runtime": "python3.13",
+    "Role": "arn:aws:iam::471112687668:role/service-role/AHH_helloworld-role-rrabedl8",
+    "Handler": "lambda_function.lambda_handler",
+    "CodeSize": 1025,
+    "Description": "",
+    "Timeout": 30,
+    "MemorySize": 128,
+    "LastModified": "2025-04-18T00:45:45.000+0000",
+    "CodeSha256": "n6x3CpF09G2R6fw6k9Ga9wg1aNrIfXWwAwna0LAMGJo=",
+    "Version": "$LATEST",
+    "TracingConfig": {
+        "Mode": "PassThrough"
+    },
+    "RevisionId": "22d3fed7-839f-4c9f-a0a1-6f417c18d1c4",
+    "State": "Active",
+    "LastUpdateStatus": "Successful",
+    "PackageType": "Zip",
+    "Architectures": [
+        "x86_64"
+    ],
+    "EphemeralStorage": {
+        "Size": 512
+    },
+    "SnapStart": {
+        "ApplyOn": "None",
+        "OptimizationStatus": "Off"
+    },
+    "RuntimeVersionConfig": {
+        "RuntimeVersionArn": "arn:aws:lambda:us-east-1::runtime:fe7a78198cc1037d599c8e576c9b94c4d6b88f8067b86f7d3481b75d9fd76c24"
+    },
+    "LoggingConfig": {
+        "LogFormat": "Text",
+        "LogGroup": "/aws/lambda/AHH_helloworld"
+    }
+}

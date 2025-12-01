@@ -1,0 +1,15 @@
+{
+    "item": [
+        {
+            "deploymentId": "dggklo",
+            "stageName": "dev",
+            "cacheClusterEnabled": false,
+            "cacheClusterSize": "0.5",
+            "cacheClusterStatus": "NOT_AVAILABLE",
+            "methodSettings": {},
+            "tracingEnabled": false,
+            "createdDate": "2025-04-18T12:51:29-03:00",
+            "lastUpdatedDate": "2025-04-19T12:57:51-03:00"
+        }
+    ]
+}

@@ -1,0 +1,44 @@
+{
+    "FunctionName": "contact_vendedor-qgvaw",
+    "FunctionArn": "arn:aws:lambda:us-east-1:471112687668:function:contact_vendedor-qgvaw",
+    "Runtime": "python3.12",
+    "Role": "arn:aws:iam::471112687668:role/service-role/contact_vendedor-qgvaw-role-DZ1QYRY2XBQ",
+    "Handler": "dummy_lambda.lambda_handler",
+    "CodeSize": 2238,
+    "Description": "",
+    "Timeout": 60,
+    "MemorySize": 128,
+    "LastModified": "2025-05-03T20:06:39.000+0000",
+    "CodeSha256": "dui6EEUJNgghhVEmPUHy8TR0GlEh98Nd2RFO8PML4kU=",
+    "Version": "$LATEST",
+    "TracingConfig": {
+        "Mode": "PassThrough"
+    },
+    "RevisionId": "76724983-21dd-4d14-9f27-24122355613c",
+    "Layers": [
+        {
+            "Arn": "arn:aws:lambda:us-east-1:471112687668:layer:gspread-layer:1",
+            "CodeSize": 3316067
+        }
+    ],
+    "State": "Active",
+    "LastUpdateStatus": "Successful",
+    "PackageType": "Zip",
+    "Architectures": [
+        "x86_64"
+    ],
+    "EphemeralStorage": {
+        "Size": 512
+    },
+    "SnapStart": {
+        "ApplyOn": "None",
+        "OptimizationStatus": "Off"
+    },
+    "RuntimeVersionConfig": {
+        "RuntimeVersionArn": "arn:aws:lambda:us-east-1::runtime:644f999c44288c3dd580a0b58d0576fe347ce4d089106e2c52ed35b626e0fb3c"
+    },
+    "LoggingConfig": {
+        "LogFormat": "Text",
+        "LogGroup": "/aws/lambda/contact_vendedor-qgvaw"
+    }
+}

@@ -1,0 +1,6 @@
+fecha,planta,unidad,produccion_mwh,disponibilidad_pct,observaciones
+2024-08-05,Bahia Blanca,GT1,125.4,92.1,Operacion normal
+2024-08-05,Bahia Blanca,GT2,118.9,88.7,Mantenimiento menor programado
+2024-08-05,Neuquen,CC1,242.7,95.3,Alta demanda pico tarde
+2024-08-06,Bahia Blanca,GT1,119.2,90.4,Recalibracion sensores
+2024-08-06,Neuquen,CC1,238.5,94.8,Operacion estable
