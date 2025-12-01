@@ -1,0 +1,10 @@
+# Terraform local artifacts (state should live in S3/DynamoDB)
+.terraform/
+*.tfstate
+*.tfstate.backup
+crash.log
+override.tf
+override.tf.json
+*override.tf
+*override.tf.json
+.terraform.tfstate.lock.info

@@ -1,0 +1,15 @@
+{
+    "item": [
+        {
+            "deploymentId": "wou0bu",
+            "stageName": "dev",
+            "cacheClusterEnabled": false,
+            "cacheClusterSize": "0.5",
+            "cacheClusterStatus": "NOT_AVAILABLE",
+            "methodSettings": {},
+            "tracingEnabled": false,
+            "createdDate": "2025-04-19T19:04:34-03:00",
+            "lastUpdatedDate": "2025-04-19T19:04:34-03:00"
+        }
+    ]
+}

@@ -1,0 +1,43 @@
+{
+    "FunctionName": "AHH_Authorizer",
+    "FunctionArn": "arn:aws:lambda:us-east-1:471112687668:function:AHH_Authorizer",
+    "Runtime": "python3.12",
+    "Role": "arn:aws:iam::471112687668:role/service-role/AHH_Authorizer-role-bjvxzkht",
+    "Handler": "lambda_function.lambda_handler",
+    "CodeSize": 719,
+    "Description": "",
+    "Timeout": 3,
+    "MemorySize": 128,
+    "LastModified": "2025-04-17T19:58:37.000+0000",
+    "CodeSha256": "JBU12oWlRc9verN1JhsClO8AzVwwpmqmMIKt8qMY4iU=",
+    "Version": "$LATEST",
+    "Environment": {
+        "Variables": {
+            "SECRET_NAME": "ahh-api-token"
+        }
+    },
+    "TracingConfig": {
+        "Mode": "PassThrough"
+    },
+    "RevisionId": "4d6558f7-d5b5-4942-82a1-086e154e3f0d",
+    "State": "Active",
+    "LastUpdateStatus": "Successful",
+    "PackageType": "Zip",
+    "Architectures": [
+        "x86_64"
+    ],
+    "EphemeralStorage": {
+        "Size": 512
+    },
+    "SnapStart": {
+        "ApplyOn": "None",
+        "OptimizationStatus": "Off"
+    },
+    "RuntimeVersionConfig": {
+        "RuntimeVersionArn": "arn:aws:lambda:us-east-1::runtime:644f999c44288c3dd580a0b58d0576fe347ce4d089106e2c52ed35b626e0fb3c"
+    },
+    "LoggingConfig": {
+        "LogFormat": "Text",
+        "LogGroup": "/aws/lambda/AHH_Authorizer"
+    }
+}
