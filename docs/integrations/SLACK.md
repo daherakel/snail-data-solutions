@@ -415,3 +415,4 @@ Configurar rate limiting en DynamoDB si es necesario (ver módulo DynamoDB).
 **Última actualización**: 2025-11-26  
 **Versión**: 1.0.0
 
+

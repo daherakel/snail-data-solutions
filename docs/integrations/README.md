@@ -63,3 +63,4 @@ Todas las integraciones implementan:
 
 **Última actualización**: 2025-11-26
 
+
