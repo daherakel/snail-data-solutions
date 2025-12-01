@@ -1,0 +1,6 @@
+{
+    "PolicyNames": [
+        "AllowInvokeLambda",
+        "lambda-query-handler-policy"
+    ]
+}

@@ -1,0 +1,26 @@
+{
+    "Role": {
+        "Path": "/service-role/",
+        "RoleName": "AHH_helloworld-role-rrabedl8",
+        "RoleId": "AROAW3MEBEA2GVPFM4V56",
+        "Arn": "arn:aws:iam::471112687668:role/service-role/AHH_helloworld-role-rrabedl8",
+        "CreateDate": "2025-04-13T13:24:01+00:00",
+        "AssumeRolePolicyDocument": {
+            "Version": "2012-10-17",
+            "Statement": [
+                {
+                    "Effect": "Allow",
+                    "Principal": {
+                        "Service": "lambda.amazonaws.com"
+                    },
+                    "Action": "sts:AssumeRole"
+                }
+            ]
+        },
+        "MaxSessionDuration": 3600,
+        "RoleLastUsed": {
+            "LastUsedDate": "2025-11-29T04:35:52+00:00",
+            "Region": "us-east-1"
+        }
+    }
+}

@@ -1,0 +1,26 @@
+{
+    "Role": {
+        "Path": "/service-role/",
+        "RoleName": "AHH_GetTranscription-role-8tiisd9a",
+        "RoleId": "AROAW3MEBEA2IXRRCMR25",
+        "Arn": "arn:aws:iam::471112687668:role/service-role/AHH_GetTranscription-role-8tiisd9a",
+        "CreateDate": "2025-04-17T19:31:25+00:00",
+        "AssumeRolePolicyDocument": {
+            "Version": "2012-10-17",
+            "Statement": [
+                {
+                    "Effect": "Allow",
+                    "Principal": {
+                        "Service": "lambda.amazonaws.com"
+                    },
+                    "Action": "sts:AssumeRole"
+                }
+            ]
+        },
+        "MaxSessionDuration": 3600,
+        "RoleLastUsed": {
+            "LastUsedDate": "2025-04-17T20:20:45+00:00",
+            "Region": "us-east-1"
+        }
+    }
+}
