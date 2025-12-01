@@ -9,7 +9,6 @@ Repositorio de soluciones SaaS de Data Engineering y AI, con módulos independie
 | [🐌 Snail Doc](modules/snail-doc/) | Asistente AI de documentos con RAG | ✅ Production |
 | [⚙️ Airflow Orchestration](modules/airflow-orchestration/) | Pipelines de datos | ✅ Production |
 | [📧 Contact Lambda](modules/contact-lambda/) | Formulario de contacto | ✅ Ready |
-| [⚡ Databricks AI TODO](modules/databricks-ai-todo/) | Agente conversacional Databricks (Pampa) | 🚧 POC |
 
 **Documentación**:
 - [📖 Deployment Guide](docs/DEPLOYMENT.md) - Guía de despliegue completa
@@ -162,3 +161,4 @@ make pytest     # Tests
 ---
 
 **Desarrollado por Snail Data Solutions** 🐌
+
